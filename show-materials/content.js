@@ -5,30 +5,69 @@ const fabricCache = new Map();
 function parseFabricFromHTML(doc) {
   const materialsFound = [];
 
-  // Look in the Product Specs table
-  const rows = doc.querySelectorAll("#productOverview_feature_div tr, #poContainer tr");
-  rows.forEach((row) => {
-    const label = row.querySelector("td:first-child")?.innerText.trim().toLowerCase();
-    const value = row.querySelector("td:last-child")?.innerText.trim();
-    if (label && (label.includes("fabric") || label.includes("material") || label.includes("care"))) {
-      materialsFound.push(value);
+  // --- Strategy 1: Modern Slide-Out & Standard Product Tables (.prodDetTable, #productOverview_feature_div) ---
+  const tableRows = doc.querySelectorAll("table.prodDetTable tr, #productOverview_feature_div tr, #poContainer tr");
+  
+  tableRows.forEach((row) => {
+    // Label can be <th> or <td> depending on the layout variant
+    const labelEl = row.querySelector("th, td:first-child");
+    const valEl = row.querySelector("td.prodDetAttrValue, td:last-child");
+
+    if (labelEl && valEl) {
+      const labelText = labelEl.innerText.trim().toLowerCase();
+      const valText = valEl.innerText.trim();
+
+      // Check for key material terms
+      if (
+        labelText.includes("material") || 
+        labelText.includes("fabric") || 
+        labelText.includes("fabric type")
+      ) {
+        if (valText && !materialsFound.includes(valText)) {
+          materialsFound.push(valText);
+        }
+      }
     }
   });
 
-  // Fallback: Search bullet points for fabric percentages (e.g., 95% Rayon, 5% Spandex)
+  // --- Strategy 2: "Top Highlights" div under title ---
   if (materialsFound.length === 0) {
-    const bullets = doc.querySelectorAll("#feature-bullets li, #detailBullets_feature_div li");
-    const fabricRegex = /(\d{1,3}%\s*[A-Za-z]+)/gi;
-
-    bullets.forEach((bullet) => {
-      const matches = bullet.innerText.match(fabricRegex);
-      if (matches) {
-        materialsFound.push(...matches);
+    const highlights = doc.querySelectorAll("#productOverview_feature_div .a-row, div[data-feature-name='productOverview'] .a-row");
+    highlights.forEach((row) => {
+      const text = row.innerText.toLowerCase();
+      if (text.includes("fabric") || text.includes("material")) {
+        const val = row.querySelector(".a-span7, span:last-child")?.innerText.trim();
+        if (val) materialsFound.push(val);
       }
     });
   }
 
-  return materialsFound.length > 0 ? Array.from(new Set(materialsFound)).join(" • ") : "Fabric info not found";
+  // --- Strategy 3: Bullet points fallback (looking for "95% Cotton" or "Material: ...") ---
+  if (materialsFound.length === 0) {
+    const bullets = doc.querySelectorAll("#feature-bullets li, #detailBullets_feature_div li");
+    
+    bullets.forEach((bullet) => {
+      const text = bullet.innerText;
+
+      // Regex for percentages: e.g. "95% Cotton", "80% Polyester, 20% Elastane"
+      const percentMatches = text.match(/(\d{1,3}%\s*[A-Za-z\s]+)/gi);
+      if (percentMatches) {
+        materialsFound.push(...percentMatches.map(m => m.trim()));
+      } else if (text.toLowerCase().includes("material:")) {
+        // e.g. "Material: Made from ultra-soft..." -> extract first sentence
+        const matSentence = text.split(":")[1]?.split(".")[0]?.trim();
+        if (matSentence) materialsFound.push(matSentence);
+      }
+    });
+  }
+
+  // Deduplicate and join results
+  if (materialsFound.length > 0) {
+    const uniqueMaterials = [...new Set(materialsFound)];
+    return uniqueMaterials.join(" • ");
+  }
+
+  return "Fabric info not found";
 }
 
 // --- 2. Tooltip UI Logic ---
