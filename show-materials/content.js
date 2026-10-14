@@ -2,6 +2,8 @@
   if (window.__fabric_detector_injected) return;
   window.__fabric_detector_injected = true;
 
+  console.log('[Fabric Inspector] Injected into:', window.location.hostname);
+
   const FIBER_LIST = [
     'cotton', 'polyester', 'spandex', 'elastane', 'rayon', 'viscose',
     'modal', 'nylon', 'polyamide', 'acrylic', 'linen', 'flax', 'wool',
@@ -12,9 +14,9 @@
 
   const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
 
-  const PART_PREFIXES = [
+  const STRICT_PREFIXES = [
     'body and lining', 'shell', 'body', 'lining', 'fill', 'padding', 'trim',
-    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff', 'hood', 'main',
+    'pocket', 'pocketing', 'rib', 'cuff', 'collar', 'main',
     'piece 1', 'piece 2', 'piece 3'
   ];
 
@@ -22,9 +24,10 @@
     'amazon.com': {
       selectors: [
         '#voyager-ns-desktop-side-sheet-content table.prodDetTable',
-        '#productOverview_feature_div',
-        '#featurebullets_feature_div',
-        '#detailBullets_feature_div'
+        '#productOverview_feature_div table',
+        '#technicalSpecifications_section_1',
+        '#detailBullets_feature_div',
+        '#featurebullets_feature_div'
       ]
     },
     'macys.com': {
@@ -79,25 +82,13 @@
     },
     'walmart.com': {
       selectors: [
-        'div[data-testid="specifications"] h4:has-text("Fabric content") + div span',
         'div[data-testid="ui-collapse-panel"] div.nt1 span',
-        'section#specifications-wrapper',
-        'div[data-testid="specifications"]'
+        'div[data-testid="specifications"]',
+        'section#specifications-wrapper'
       ],
       preAction: () => {
         const expandBtn = document.querySelector('button[data-testid="ui-collapse-panel-header"][aria-expanded="false"], section#specifications-wrapper button');
         if (expandBtn) expandBtn.click();
-      }
-    },
-    'gap.com': {
-      selectors: [
-        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
-        'div[class*="fds_panel_details-content"]',
-        '#pdp-product-info-container'
-      ],
-      preAction: () => {
-        const panel = document.querySelector('.productInformationItem button[aria-expanded="false"]');
-        if (panel) panel.click();
       }
     },
     'oldnavy.gap.com': {
@@ -113,6 +104,17 @@
         'div[class*="fds_panel_details-content"]',
         '#pdp-product-info-container'
       ]
+    },
+    'gap.com': {
+      selectors: [
+        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
+        'div[class*="fds_panel_details-content"]',
+        '#pdp-product-info-container'
+      ],
+      preAction: () => {
+        const panel = document.querySelector('.productInformationItem button[aria-expanded="false"]');
+        if (panel) panel.click();
+      }
     },
     'nordstrom.com': {
       selectors: [
@@ -179,10 +181,12 @@
       selectors: [
         'div#sectionMaterialsAndCareAccordion ul li span',
         'div#sectionMaterialsAndCareAccordion ul li',
-        'div#sectionMaterialsAndCareAccordion'
+        'div#sectionMaterialsAndCareAccordion',
+        'dl[class*="materials"] dd',
+        'section[class*="MaterialsAndCare"]'
       ],
       preAction: () => {
-        const toggle = document.querySelector('#toggle-materialsAndCareAccordion[aria-expanded="false"]');
+        const toggle = document.querySelector('#toggle-materialsAndCareAccordion[aria-expanded="false"], button[aria-controls*="materialsAndCare"]');
         if (toggle) toggle.click();
       }
     },
@@ -239,16 +243,17 @@
             }
           }
         }
-      } catch (e) {
-        // Ignore malformed JSON-LD scripts
-      }
+      } catch (e) {}
     }
     return texts.join(' \n ');
   }
 
-  function extractFromAdapter() {
+  function extractFromAdapter(context = document) {
     const host = window.location.hostname.replace(/^www\./, '');
-    const adapterKey = Object.keys(SITE_ADAPTERS).find(domain => host.endsWith(domain));
+    
+    // Sort keys descending so longer subdomains match before top domains
+    const sortedKeys = Object.keys(SITE_ADAPTERS).sort((a, b) => b.length - a.length);
+    const adapterKey = sortedKeys.find(domain => host.endsWith(domain));
 
     if (!adapterKey) return '';
     const adapter = SITE_ADAPTERS[adapterKey];
@@ -259,7 +264,7 @@
 
     const matches = [];
     for (const sel of adapter.selectors) {
-      const elements = document.querySelectorAll(sel);
+      const elements = context.querySelectorAll(sel);
       for (const el of elements) {
         if (el && el.innerText) {
           matches.push(el.innerText);
@@ -270,14 +275,14 @@
     return matches.join(' \n ');
   }
 
-  function extractFromGenericDOM() {
-    const candidateNodes = document.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
+  function extractFromGenericDOM(context = document) {
+    const candidateNodes = context.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
     const relevant = [];
 
     for (const node of candidateNodes) {
       if (node.children.length <= 1) {
         const text = node.innerText || '';
-        if (text.length < 300 && FIBER_LIST.some(fiber => text.toLowerCase().includes(fiber))) {
+        if (text.length < 300 && text.includes('%') && FIBER_LIST.some(fiber => text.toLowerCase().includes(fiber))) {
           relevant.push(text);
         }
       }
@@ -289,21 +294,24 @@
     if (!rawText) return null;
 
     const fiberPattern = FIBER_LIST.join('|');
-    const lines = rawText.split(/\r?\n|;/).map(l => l.trim()).filter(Boolean);
+    const lines = rawText.split(/\r?\n|;|\u2022|·|<br\s*\/?>/).map(l => l.trim()).filter(Boolean);
     const sections = [];
 
     for (const line of lines) {
+      const isSleeveDescription = /long sleeve|short sleeve|sleeveless|cuff sleeve/i.test(line);
+
+      let currentSection = 'General';
+      if (!isSleeveDescription) {
+        const partMatch = line.match(new RegExp(`^(${STRICT_PREFIXES.join('|')})\\s*[:\\-]`, 'i'));
+        if (partMatch) {
+          currentSection = partMatch[1].charAt(0).toUpperCase() + partMatch[1].slice(1).toLowerCase();
+        }
+      }
+
       const lineRegex = new RegExp(
         `(\\d{1,3})%\\s*(?:of\\s+)?${DESCRIPTORS}(${fiberPattern})|${DESCRIPTORS}(${fiberPattern})\\s*[:\\-]?\\s*(\\d{1,3})%`,
         'gi'
       );
-
-      let currentSection = 'General';
-      const partRegex = new RegExp(`(${PART_PREFIXES.join('|')})\\s*:?`, 'i');
-      const partMatch = line.match(partRegex);
-      if (partMatch) {
-        currentSection = partMatch[1].charAt(0).toUpperCase() + partMatch[1].slice(1).toLowerCase();
-      }
 
       let match;
       const findings = [];
@@ -388,6 +396,7 @@
         cursor: pointer;
         line-height: 1;
         padding: 0;
+        transition: color 0.15s ease;
       }
       .close-btn:hover {
         color: #ffffff;
@@ -420,6 +429,7 @@
         font-size: 12px;
         font-weight: 500;
         margin-bottom: 3px;
+        color: #569481;
       }
       .fiber-name {
         text-transform: capitalize;
@@ -494,31 +504,142 @@
     } catch (e) {}
   }
 
-  function inspectPage() {
-    let rawText = extractFromJsonLd();
-    let parsed = parseComposition(rawText);
+  function extractAmazonDirect() {
+    const drawerRows = document.querySelectorAll(
+      '#voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #productOverview_feature_div table tr'[cite: 1]
+    );
+    for (const row of drawerRows) {
+      const text = row.innerText.toLowerCase();
+      if (text.includes('fabric') || text.includes('material')) {
+        return row.innerText;
+      }
+    }
+    const techTable = document.querySelector('#technicalSpecifications_section_1, #detailBullets_feature_div');
+    if (techTable) return techTable.innerText;
+    return null;
+  }
 
-    if (!parsed) {
-      rawText = extractFromAdapter();
-      parsed = parseComposition(rawText);
+  function inspectPage(context = document) {
+    let parsed = null;
+
+    if (window.location.hostname.includes('amazon.com')) {
+      const amazonText = extractAmazonDirect();
+      if (amazonText) {
+        parsed = parseComposition(amazonText);
+        if (parsed) console.log('[Fabric Inspector] Found via Amazon direct table:', parsed);
+      }
     }
 
     if (!parsed) {
-      rawText = extractFromGenericDOM();
+      const rawText = extractFromJsonLd();
       parsed = parseComposition(rawText);
+      if (parsed) console.log('[Fabric Inspector] Found via JSON-LD:', parsed);
+    }
+
+    if (!parsed) {
+      const rawText = extractFromAdapter(context);
+      parsed = parseComposition(rawText);
+      if (parsed) console.log('[Fabric Inspector] Found via Site Adapter:', parsed);
+    }
+
+    if (!parsed) {
+      const rawText = extractFromGenericDOM(context);
+      parsed = parseComposition(rawText);
+      if (parsed) console.log('[Fabric Inspector] Found via Generic DOM:', parsed);
     }
 
     if (parsed) {
       renderBadge(parsed);
-    } else {
-      const root = document.getElementById('fabric-detector-root');
-      if (root) root.remove();
-      try {
-        chrome.runtime.sendMessage({ type: 'FABRIC_NOT_FOUND' });
-      } catch (e) {}
     }
   }
 
+  // --- AMAZON ASIN HOVER FETCH (For Search / Grid Pages) ---
+  const asinCache = new Map();
+
+  function getAmazonAsin(el) {
+    const card = el.closest('[data-asin]');
+    if (card && card.dataset.asin && card.dataset.asin.trim().length === 10) {
+      return card.dataset.asin.trim();
+    }
+    const anchor = el.closest('a[href*="/dp/"]');
+    if (anchor) {
+      const match = anchor.href.match(/\/dp\/([A-Z0-9]{10})/i);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  async function fetchAndParseAsin(asin) {
+    if (asinCache.has(asin)) {
+      const cachedData = asinCache.get(asin);
+      if (cachedData) renderBadge(cachedData);
+      return;
+    }
+
+    try {
+      const res = await fetch(`https://www.amazon.com/dp/${asin}`, {
+        headers: { 'Accept': 'text/html' }
+      });
+      if (!res.ok) return;
+      const htmlText = await res.text();
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+
+      let rawText = '';
+      const tables = doc.querySelectorAll('#voyager-ns-desktop-side-sheet-content table.prodDetTable, #productOverview_feature_div, #detailBullets_feature_div');
+      for (const t of tables) {
+        rawText += t.innerText + ' \n ';
+      }
+
+      if (!rawText) {
+        const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+        for (const s of scripts) {
+          rawText += s.textContent + ' \n ';
+        }
+      }
+
+      const parsed = parseComposition(rawText);
+      asinCache.set(asin, parsed);
+      if (parsed) {
+        renderBadge(parsed);
+      }
+    } catch (err) {
+      console.debug('[Fabric Inspector] ASIN fetch failed:', err);
+    }
+  }
+
+  // --- MOUSEOVER / HOVER LISTENER ---
+  let hoverTimer = null;
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest('#fabric-detector-root')) return;
+
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      const target = e.target;
+      if (!target) return;
+
+      const hostname = window.location.hostname;
+
+      // Amazon Search / Category Grids
+      if (hostname.includes('amazon.com')) {
+        const asin = getAmazonAsin(target);
+        const currentUrlAsin = window.location.pathname.match(/\/dp\/([A-Z0-9]{10})/i)?.[1];
+        if (asin && asin !== currentUrlAsin) {
+          fetchAndParseAsin(asin);
+          return;
+        }
+      }
+
+      // Swatches across retail detail pages
+      const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
+      if (swatch) {
+        inspectPage(document);
+      }
+    }, 200);
+  });
+
+  // --- SPA ROUTE & DOM OBSERVER ---
   let lastHref = location.href;
   let debounceTimeout = null;
 
@@ -526,20 +647,22 @@
     if (location.href !== lastHref) {
       lastHref = location.href;
       clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(inspectPage, 800);
+      debounceTimeout = setTimeout(() => inspectPage(document), 600);
       return;
     }
 
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
       if (!document.getElementById('fabric-detector-root')) {
-        inspectPage();
+        inspectPage(document);
       }
     }, 1500);
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  inspectPage();
-  setTimeout(inspectPage, 1500);
+  // Initial staged checks to accommodate modern SPA hydration
+  inspectPage(document);
+  setTimeout(() => inspectPage(document), 1000);
+  setTimeout(() => inspectPage(document), 2500);
 })();
