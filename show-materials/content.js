@@ -18,64 +18,264 @@
 
   // Retailer-specific DOM targets
   const SITE_ADAPTERS = {
+    // Amazon (including Voyager drawer)
     'amazon.com': {
       selectors: [
-        '#voyager-ns-desktop-side-sheet-content table.prodDetTable', //[cite: 1]
+        '#voyager-ns-desktop-side-sheet-content table.prodDetTable',
         '#productOverview_feature_div',
         '#featurebullets_feature_div',
         '#detailBullets_feature_div'
       ]
     },
+  
+    // Macy's: Targets data-auto="materials-care-section" and data-testid="itemTypeText"
     'macys.com': {
       selectors: [
-        '[data-auto="product-description-bullets"]',
-        '.accordion-body-details',
-        '.pdp-details'
+        'li[data-auto="materials-care-section"] [data-testid="itemTypeText"]',
+        'li[data-auto="materials-care-section"]',
+        '[data-testid="product-details-section"]'
+      ]
+    },
+  
+    // American Eagle / Aerie: Uses dynamic hash classes, so we rely on stable data attributes
+    'ae.com': {
+      selectors: [
+        'div[data-testid="equity-group"] ul[class*="list"] li',
+        'div[data-testid="equity-group"]',
+        '.accordion-body-visible'
       ],
       preAction: () => {
-        const accordion = document.querySelector('[data-auto="accordion-materials"], [aria-controls*="details"]');
-        if (accordion && accordion.getAttribute('aria-expanded') === 'false') {
+        // Expands the "Materials & Care" collapsible panel if closed
+        const btn = document.querySelector('button[data-test-panel-link][aria-expanded="false"]');
+        if (btn) btn.click();
+      }
+    },
+  
+    // Aéropostale: Inside #product-description-info container
+    'aeropostale.com': {
+      selectors: [
+        '#product-description-info .long-description ul li',
+        '#product-description-info .long-description',
+        '.product-details-container'
+      ]
+    },
+  
+    // Hot Topic: Inside accordion item #collapsible-details-1
+    'hottopic.com': {
+      selectors: [
+        '#collapsible-details-1 ul li',
+        '#collapsible-details-1',
+        '#product_detail_accordion_content-1'
+      ],
+      preAction: () => {
+        // Hot topic accordion toggle
+        const header = document.querySelector('#product_detail_accordion .accordion-header, h2[class*="accordion-header"]');
+        const content = document.querySelector('#product_detail_accordion_content-1');
+        if (header && content && !content.classList.contains('show')) {
+          header.click();
+        }
+      }
+    },
+  
+    // Target: In item-details-specifications (handles multi-piece pajama/suit sets)
+    'target.com': {
+      selectors: [
+        'div[data-test="item-details-specifications"] div:has(> b)',
+        'div[data-test="item-details-specifications"]',
+        '#specAndDescript'
+      ],
+      preAction: () => {
+        // Auto-open specifications accordion if collapsed
+        const specButton = document.querySelector('button[id*="specifications-accordion"][aria-expanded="false"]');
+        if (specButton) specButton.click();
+      }
+    },
+  
+    // Walmart: Inside specifications-wrapper under "Fabric content"
+    'walmart.com': {
+      selectors: [
+        'div[data-testid="specifications"] h4:has-text("Fabric content") + div span', // Fallback helper
+        'div[data-testid="ui-collapse-panel"] div.nt1 span',
+        'section#specifications-wrapper',
+        'div[data-testid="specifications"]'
+      ],
+      preAction: () => {
+        // Expand Walmart specs panel if closed
+        const expandBtn = document.querySelector('button[data-testid="ui-collapse-panel-header"][aria-expanded="false"], section#specifications-wrapper button');
+        if (expandBtn) expandBtn.click();
+      }
+    },
+  
+    // Gap Inc. Ecosystem (Gap, Old Navy, Banana Republic, Athleta)
+    'gap.com': {
+      selectors: [
+        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
+        'div[class*="fds_panel_details-content"]',
+        '#pdp-product-info-container'
+      ],
+      preAction: () => {
+        const panel = document.querySelector('.productInformationItem button[aria-expanded="false"]');
+        if (panel) panel.click();
+      }
+    },
+  
+    'oldnavy.gap.com': {
+      selectors: [
+        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
+        'div[class*="fds_panel_details-content"]',
+        '#pdp-product-info-container'
+      ]
+    },
+  
+    'bananarepublic.gap.com': {
+      selectors: [
+        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
+        'div[class*="fds_panel_details-content"]',
+        '#pdp-product-info-container'
+      ]
+    }
+  },
+  
+  // Nordstrom & Nordstrom Rack
+  'nordstrom.com': {
+    selectors: [
+      'ul li[class*="dls-ihm"]' // Matches the dls-ihm460 items directly
+    ],
+    customExtract: () => {
+      // Find the <h2> with text "Details & care"
+      const headings = Array.from(document.querySelectorAll('h2'));
+      const detailsHeading = headings.find(h => h.textContent.trim().toLowerCase().includes('details & care'));
+      
+      if (detailsHeading && detailsHeading.parentElement) {
+        // Return all list items inside this section
+        const items = detailsHeading.parentElement.querySelectorAll('ul li');
+        return Array.from(items).map(li => li.textContent).join(' \n ');
+      }
+      return null;
+    }
+  },
+  
+  // Zara: Materials are placed in structured-component-text-block-paragraph spans[cite: 13]
+    'zara.com': {
+      selectors: [
+        'div[class*="structured-component-text-block-paragraph"] span[class*="zds-body-m"]', //[cite: 13]
+        'div[class*="structured-component-text-block-paragraph"] span', //[cite: 13]
+        'div[class*="structured-component-text-block-paragraph"]' //[cite: 13]
+      ]
+    },
+  
+    // Shein: Stored under description-content_val-content with attribute name "Composition"[cite: 14]
+    'shein.com': {
+      selectors: [
+        'span.description-content__val-content', //[cite: 14]
+        'div[class*="description-content__list-text-val"]', //[cite: 14]
+        'div.description-content' //[cite: 14]
+      ],
+      preAction: () => {
+        // Clicks "View more" on the product specs table if truncated[cite: 14]
+        const viewMoreBtn = document.querySelector('button.new-goods-attr__view-more'); //[cite: 14]
+        if (viewMoreBtn) viewMoreBtn.click(); //[cite: 14]
+      }
+    },
+  
+    // ASOS: Inside the product description accordion details container[cite: 15]
+    'asos.com': {
+      selectors: [
+        '#productDescriptionDetails div[class*="F_yff"]', //[cite: 15]
+        'div[data-testid="productDescriptionDetails"]', //[cite: 15]
+        '#productDescriptionDetails' //[cite: 15]
+      ],
+      preAction: () => {
+        // Open the accordion if it is closed[cite: 15]
+        const btn = document.querySelector('#productDescriptionDetails h2[data-testid="heading"]'); //[cite: 15]
+        const wrapper = document.querySelector('#productDescriptionDetails'); //[cite: 15]
+        if (btn && wrapper && wrapper.style.visibility === 'hidden') {
+          btn.click();
+        }
+      }
+    },
+  
+    // J.Crew: List items inside .ProductDetails_tech-list[cite: 16]
+    'jcrew.com': {
+      selectors: [
+        'ul[class*="ProductDetails_tech-list"] li[class*="ProductDetails_tech-item"]', //[cite: 16]
+        'ul[class*="ProductDetails_tech-list"]', //[cite: 16]
+        'div[class*="ProductDetails_product-details-content"]' //[cite: 16]
+      ],
+      preAction: () => {
+        // Expand Product Details accordion if collapsed[cite: 16]
+        const accordionBtn = document.querySelector('button[aria-controls="accordion-panel--r2"][aria-expanded="false"]'); //[cite: 16]
+        if (accordionBtn) accordionBtn.click();
+      }
+    },
+  
+    // Uniqlo: Inside p[data-testid="ITOTypography"] under #productMaterialDescription-content
+    'uniqlo.com': {
+      selectors: [
+        '#productMaterialDescription-content p[data-testid="ITOTypography"]', //
+        'div[id="productMaterialDescription-content"]', //[cite: 17]
+        'div[data-testid="ITOTypography"]' //[cite: 17]
+      ],
+      preAction: () => {
+        // Expand "Materials / Care" accordion if collapsed[cite: 17]
+        const accordionBtn = document.querySelector('button[aria-controls*="productMaterialDescription"][aria-expanded="false"]'); //[cite: 17]
+        if (accordionBtn) accordionBtn.click();
+      }
+    },
+  
+    // H&M: Inside sectionMaterialsAndCareAccordion in a list item span
+    'hm.com': {
+      selectors: [
+        'div#sectionMaterialsAndCareAccordion ul li span', //
+        'div#sectionMaterialsAndCareAccordion ul li', //[cite: 18]
+        'div#sectionMaterialsAndCareAccordion' //[cite: 18]
+      ],
+      preAction: () => {
+        // Open the "Materials & Care" drawer if collapsed[cite: 18]
+        const toggle = document.querySelector('#toggle-materialsAndCareAccordion[aria-expanded="false"]'); //[cite: 18]
+        if (toggle) toggle.click(); //[cite: 18]
+      }
+    },
+  
+    // Urban Outfitters: Content + Care paragraph inside the CMS markdown block[cite: 19]
+    'urbanoutfitters.com': {
+      selectors: [
+        'div.s-pwa-cms.c-pwa-markdown p', //[cite: 19]
+        'div[class*="c-pwa-product-details__details"] p', //[cite: 19]
+        'div[class*="c-pwa-product-details__details"]' //[cite: 19]
+      ],
+      preAction: () => {
+        // Open "Details" accordion if collapsed[cite: 19]
+        const accordion = document.querySelector('div[class*="c-pwa-product-details__details"] h2'); //[cite: 19]
+        const panel = document.querySelector('.o-pwa-accordion__panel'); //[cite: 19]
+        if (accordion && panel && panel.style.display === 'none') {
           accordion.click();
         }
       }
     },
-    'target.com': {
+  
+    // Hollister: Inside fabric-care-mfe h4 label (also works across Abercrombie & Fitch)
+    'hollisterco.com': {
       selectors: [
-        '[data-test="item-details-specifications"]',
-        'div[data-test="item-details-description"]',
-        '#specAndDescript'
-      ]
+        'h4.fabric-care-mfe__label', //
+        'div[data-testid="fabric-care-mfe"]', //[cite: 20]
+        '#details-accordion-panel-id' //[cite: 20]
+      ],
+      preAction: () => {
+        // Expand "Details & Material" accordion if closed[cite: 20]
+        const btn = document.querySelector('div[data-testid="accordion-header"][aria-expanded="false"]'); //[cite: 20]
+        if (btn) btn.click();
+      }
     },
-    'walmart.com': {
+    // Abercrombie & Fitch shares Hollister's exact A&F Co platform[cite: 20]
+    'abercrombie.com': {
       selectors: [
-        '[data-testid="product-description-content"]',
-        'section[data-testid="specifications-section"]',
-        '#specifications'
+        'h4.fabric-care-mfe__label', //[cite: 20]
+        'div[data-testid="fabric-care-mfe"]', //[cite: 20]
+        '#details-accordion-panel-id' //[cite: 20]
       ]
-    },
-    'ae.com': {
-      selectors: [
-        '.pdp-details-materials',
-        '.product-details-content',
-        '.pdp-desc-materials'
-      ]
-    },
-    'aeropostale.com': {
-      selectors: [
-        '.product-details',
-        '.pdp-tab-content',
-        '.details-text'
-      ]
-    },
-    'hottopic.com': {
-      selectors: [
-        '.product-details-section',
-        '.product-description',
-        '.details-content'
-      ]
-    }
-  };
-
+    };
+ 
   /**
    * 1. Schema / JSON-LD Extraction
    */
