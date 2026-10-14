@@ -13,17 +13,17 @@
 
   const PART_PREFIXES = [
     'shell', 'body', 'lining', 'fill', 'padding', 'trim',
-    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff'
+    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff', 'hood'
   ];
 
   // Retailer-specific DOM targets
   const SITE_ADAPTERS = {
     'amazon.com': {
       selectors: [
+        '#voyager-ns-desktop-side-sheet-content table.prodDetTable', //[cite: 1]
         '#productOverview_feature_div',
         '#featurebullets_feature_div',
-        '#detailBullets_feature_div',
-        '#technicalSpecifications_feature_div'
+        '#detailBullets_feature_div'
       ]
     },
     'macys.com': {
@@ -223,7 +223,7 @@
         z-index: 2147483647;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background: #ffffff;
-        color: #1f2937;
+        color: #569481;
         border-radius: 12px;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         width: 280px;
@@ -232,7 +232,7 @@
         transition: all 0.2s ease;
       }
       .card-header {
-        background: #0f172a;
+        background: #000000;
         color: #ffffff;
         padding: 10px 14px;
         display: flex;
@@ -245,7 +245,7 @@
       .close-btn {
         background: none;
         border: none;
-        color: #94a3b8;
+        color: #569481;
         font-size: 18px;
         cursor: pointer;
         line-height: 1;
@@ -269,7 +269,7 @@
         font-size: 11px;
         text-transform: uppercase;
         font-weight: 700;
-        color: #64748b;
+        color: #569481;
         margin-bottom: 6px;
         letter-spacing: 0.05em;
       }
@@ -296,9 +296,9 @@
         height: 100%;
         border-radius: 3px;
       }
-      .fill-natural { background: #10b981; }
-      .fill-synthetic { background: #3b82f6; }
-      .fill-delicate { background: #f59e0b; }
+      .fill-natural { background: #1ce8a9; }
+      .fill-synthetic { background: #f7391b; }
+      .fill-delicate { background: #4facf7; }
     `;
     shadow.appendChild(style);
 

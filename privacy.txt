@@ -1,0 +1,26 @@
+# Privacy Policy for Fabric Composition Inspector
+
+Last Updated: October 2026
+
+The Fabric Composition Inspector Extention is dedicated to protecting your privacy. This policy explains what information is processed and how it is handled.
+
+### 1. Data Collection and Usage
+The Extension does not collect, record, transmit, or monetize any personally identifiable information (PII).
+- **Page Content:** When you visit supported clothing retail websites (such as Amazon, Target, Macy's, Walmart, etc.), the extension parses on-page product specifications and structured metadata (JSON-LD) locally within your browser to detect garment fabric percentages. This analysis happens entirely on your device.
+- **No Browsing History Stored:** The extension does not record, log, or store your browsing history or visited URLs.
+- **No External Servers:** No scraped data, search inputs, or page contents are sent to external servers or third parties.
+
+### 2. Permissions Justification
+- **Host Permissions:** Required strictly to inject the local content script into supported retail domains so it can detect fabric text on product detail pages.
+- **Storage:** If enabled, `chrome.storage.local` is used solely to store local client-side preferences (such as minimizing the fabric breakdown card) on your machine.
+
+### 3. Third-Party Sharing and Sale of Data
+We do not sell, rent, trade, or transfer any user data to third parties. We do not use user data for advertising, creditworthiness evaluation, or market profiling.
+
+### 4. Changes to This Policy
+We may update this policy if new features are added. Any changes will be posted to this page.
+
+### 5. Contact
+If you have questions regarding this privacy policy, please contact:
+Hansita Penikalapati
+Email: hansitapenikalapati@gmail.com
