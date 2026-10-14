@@ -144,16 +144,16 @@
       ]
     },
   
-  // Nordstrom & Nordstrom Rack
-  'nordstrom.com': {
-    selectors: [
-      'ul li[class*="dls-ihm"]', //[cite: 12]
-      'div:has(> h2) ul li', //[cite: 12]
-      'section[aria-labelledby="pdp-prompts-heading"] + div ul li' //[cite: 12]
-    ]
-  },
-  
-  // Zara: Materials are placed in structured-component-text-block-paragraph spans[cite: 13]
+    // Nordstrom & Nordstrom Rack
+    'nordstrom.com': {
+      selectors: [
+        'ul li[class*="dls-ihm"]', //[cite: 12]
+        'div:has(> h2) ul li', //[cite: 12]
+        'section[aria-labelledby="pdp-prompts-heading"] + div ul li' //[cite: 12]
+      ]
+    },
+    
+    // Zara: Materials are placed in structured-component-text-block-paragraph spans[cite: 13]
     'zara.com': {
       selectors: [
         'div[class*="structured-component-text-block-paragraph"] span[class*="zds-body-m"]', //[cite: 13]
