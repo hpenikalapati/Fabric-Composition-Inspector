@@ -148,20 +148,10 @@
   // Nordstrom & Nordstrom Rack
   'nordstrom.com': {
     selectors: [
-      'ul li[class*="dls-ihm"]' // Matches the dls-ihm460 items directly
-    ],
-    customExtract: () => {
-      // Find the <h2> with text "Details & care"
-      const headings = Array.from(document.querySelectorAll('h2'));
-      const detailsHeading = headings.find(h => h.textContent.trim().toLowerCase().includes('details & care'));
-      
-      if (detailsHeading && detailsHeading.parentElement) {
-        // Return all list items inside this section
-        const items = detailsHeading.parentElement.querySelectorAll('ul li');
-        return Array.from(items).map(li => li.textContent).join(' \n ');
-      }
-      return null;
-    }
+      'ul li[class*="dls-ihm"]', //[cite: 12]
+      'div:has(> h2) ul li', //[cite: 12]
+      'section[aria-labelledby="pdp-prompts-heading"] + div ul li' //[cite: 12]
+    ]
   },
   
   // Zara: Materials are placed in structured-component-text-block-paragraph spans[cite: 13]
