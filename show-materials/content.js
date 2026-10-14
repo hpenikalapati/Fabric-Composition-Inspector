@@ -506,7 +506,7 @@
 
   function extractAmazonDirect() {
     const drawerRows = document.querySelectorAll(
-      '#voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #productOverview_feature_div table tr'[cite: 1]
+      '#voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #productOverview_feature_div table tr'
     );
     for (const row of drawerRows) {
       const text = row.innerText.toLowerCase();
