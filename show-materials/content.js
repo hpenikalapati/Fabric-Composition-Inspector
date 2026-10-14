@@ -8,12 +8,21 @@
     'cotton', 'polyester', 'spandex', 'elastane', 'rayon', 'viscose',
     'modal', 'nylon', 'polyamide', 'acrylic', 'linen', 'flax', 'wool',
     'merino wool', 'cashmere', 'silk', 'lyocell', 'tencel', 'polyurethane',
-    'leather', 'suede', 'down', 'feather', 'alpaca', 'mohair', 'hemp', 'jute'
+    'leather', 'suede', 'down', 'feather', 'alpaca', 'mohair', 'hemp', 
+    'jute', 'metallic', 'acrylic'
   ];
+  
+  // Allows optional descriptors like "organic", "recycled", or "raw"
+  const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
+  
+  const FABRIC_REGEX = new RegExp(
+    `(\\d{1,3})%?\\s*(?:of\\s+)?${DESCRIPTORS}(${FIBER_LIST.join('|')})|${DESCRIPTORS}(${FIBER_LIST.join('|')})\\s*[:\\-]?\\s*(\\d{1,3})%`,
+    'gi'
+  );
 
   const PART_PREFIXES = [
     'shell', 'body', 'lining', 'fill', 'padding', 'trim',
-    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff', 'hood'
+    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff', 'hood', 'main'
   ];
 
   // Retailer-specific DOM targets
