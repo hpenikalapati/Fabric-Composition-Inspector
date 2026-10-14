@@ -27,7 +27,7 @@
     "*://*.hm.com/*",
     "*://*.urbanoutfitters.com/*",
     "*://*.hollisterco.com/*",
-    "*://*.abercromie.com/*"
+    "*://*.abercrombie.com/*"
   ],
   "action": {
     "default_title": "Fabric Composition Inspector"
@@ -57,7 +57,7 @@
         "*://*.hm.com/*",
         "*://*.urbanoutfitters.com/*",
         "*://*.hollisterco.com/*",
-        "*://*.abercromie.com/*"
+        "*://*.abercrombie.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
