@@ -1,153 +1,413 @@
-// --- Cache to store fetched fabric info so we don't fetch twice ---
-const fabricCache = new Map();
+(() => {
+  // Prevent duplicate script execution
+  if (window.__fabric_detector_injected) return;
+  window.__fabric_detector_injected = true;
 
-// --- 1. Parser to extract fabric info from Amazon HTML ---
-function parseFabricFromHTML(doc) {
-  const materialsFound = [];
+  // Comprehensive fiber registry
+  const FIBER_LIST = [
+    'cotton', 'polyester', 'spandex', 'elastane', 'rayon', 'viscose',
+    'modal', 'nylon', 'polyamide', 'acrylic', 'linen', 'flax', 'wool',
+    'merino wool', 'cashmere', 'silk', 'lyocell', 'tencel', 'polyurethane',
+    'leather', 'suede', 'down', 'feather', 'alpaca', 'mohair', 'hemp', 'jute'
+  ];
 
-  // --- Strategy 1: Modern Slide-Out & Standard Product Tables (.prodDetTable, #productOverview_feature_div) ---
-  const tableRows = doc.querySelectorAll("table.prodDetTable tr, #productOverview_feature_div tr, #poContainer tr");
-  
-  tableRows.forEach((row) => {
-    // Label can be <th> or <td> depending on the layout variant
-    const labelEl = row.querySelector("th, td:first-child");
-    const valEl = row.querySelector("td.prodDetAttrValue, td:last-child");
+  const PART_PREFIXES = [
+    'shell', 'body', 'lining', 'fill', 'padding', 'trim',
+    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff'
+  ];
 
-    if (labelEl && valEl) {
-      const labelText = labelEl.innerText.trim().toLowerCase();
-      const valText = valEl.innerText.trim();
+  // Retailer-specific DOM targets
+  const SITE_ADAPTERS = {
+    'amazon.com': {
+      selectors: [
+        '#productOverview_feature_div',
+        '#featurebullets_feature_div',
+        '#detailBullets_feature_div',
+        '#technicalSpecifications_feature_div'
+      ]
+    },
+    'macys.com': {
+      selectors: [
+        '[data-auto="product-description-bullets"]',
+        '.accordion-body-details',
+        '.pdp-details'
+      ],
+      preAction: () => {
+        const accordion = document.querySelector('[data-auto="accordion-materials"], [aria-controls*="details"]');
+        if (accordion && accordion.getAttribute('aria-expanded') === 'false') {
+          accordion.click();
+        }
+      }
+    },
+    'target.com': {
+      selectors: [
+        '[data-test="item-details-specifications"]',
+        'div[data-test="item-details-description"]',
+        '#specAndDescript'
+      ]
+    },
+    'walmart.com': {
+      selectors: [
+        '[data-testid="product-description-content"]',
+        'section[data-testid="specifications-section"]',
+        '#specifications'
+      ]
+    },
+    'ae.com': {
+      selectors: [
+        '.pdp-details-materials',
+        '.product-details-content',
+        '.pdp-desc-materials'
+      ]
+    },
+    'aeropostale.com': {
+      selectors: [
+        '.product-details',
+        '.pdp-tab-content',
+        '.details-text'
+      ]
+    },
+    'hottopic.com': {
+      selectors: [
+        '.product-details-section',
+        '.product-description',
+        '.details-content'
+      ]
+    }
+  };
 
-      // Check for key material terms
-      if (
-        labelText.includes("material") || 
-        labelText.includes("fabric") || 
-        labelText.includes("fabric type")
-      ) {
-        if (valText && !materialsFound.includes(valText)) {
-          materialsFound.push(valText);
+  /**
+   * 1. Schema / JSON-LD Extraction
+   */
+  function extractFromJsonLd() {
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    const texts = [];
+
+    for (const script of scripts) {
+      try {
+        const json = JSON.parse(script.textContent);
+        const nodes = Array.isArray(json) ? json : (json['@graph'] || [json]);
+
+        for (const item of nodes) {
+          if (item['@type'] === 'Product' || item['@type'] === 'IndividualProduct') {
+            if (item.material) {
+              texts.push(typeof item.material === 'string' ? item.material : JSON.stringify(item.material));
+            }
+            if (item.description) texts.push(item.description);
+          }
+        }
+      } catch (e) {
+        // Suppress JSON parse errors on malformed vendor tags
+      }
+    }
+    return texts.join(' \n ');
+  }
+
+  /**
+   * 2. Adapter-Specific DOM Extraction
+   */
+  function extractFromAdapter() {
+    const host = window.location.hostname.replace(/^www\./, '');
+    const adapterKey = Object.keys(SITE_ADAPTERS).find(domain => host.endsWith(domain));
+
+    if (!adapterKey) return '';
+    const adapter = SITE_ADAPTERS[adapterKey];
+
+    if (adapter.preAction) {
+      try { adapter.preAction(); } catch (e) {}
+    }
+
+    const matches = [];
+    for (const sel of adapter.selectors) {
+      const el = document.querySelector(sel);
+      if (el) matches.push(el.innerText);
+    }
+
+    return matches.join(' \n ');
+  }
+
+  /**
+   * 3. Generic DOM Crawler
+   */
+  function extractFromGenericDOM() {
+    const candidateNodes = document.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
+    const relevant = [];
+
+    for (const node of candidateNodes) {
+      if (node.children.length <= 1) {
+        const text = node.innerText || '';
+        if (text.length < 300 && FIBER_LIST.some(fiber => text.toLowerCase().includes(fiber))) {
+          relevant.push(text);
         }
       }
     }
+    return relevant.join(' \n ');
+  }
+
+  /**
+   * 4. Multi-Part Composition Parsing Engine
+   */
+  function parseComposition(rawText) {
+    if (!rawText) return null;
+
+    const fiberPattern = FIBER_LIST.join('|');
+    const lines = rawText.split(/\r?\n|;/).map(l => l.trim()).filter(Boolean);
+    const sections = [];
+
+    // Pattern A: "80% Cotton, 20% Polyester"
+    // Pattern B: "Cotton: 80%, Polyester: 20%"
+    const regex = new RegExp(`(\\d{1,3})%\\s*(?:of\\s+)?(${fiberPattern})|(${fiberPattern})\\s*[:\\-]?\\s*(\\d{1,3})%`, 'gi');
+
+    for (const line of lines) {
+      // Detect if line sets a section context (e.g. "Shell:", "Lining:")
+      let currentSection = 'General';
+      const partRegex = new RegExp(`(${PART_PREFIXES.join('|')})\\s*:?`, 'i');
+      const partMatch = line.match(partRegex);
+      if (partMatch) {
+        currentSection = partMatch[1].charAt(0).toUpperCase() + partMatch[1].slice(1).toLowerCase();
+      }
+
+      let match;
+      const findings = [];
+      while ((match = regex.exec(line)) !== null) {
+        const percentage = parseInt(match[1] || match[4], 10);
+        const fiber = (match[2] || match[3]).toLowerCase();
+
+        if (percentage > 0 && percentage <= 100) {
+          findings.push({ fiber, percentage });
+        }
+      }
+
+      if (findings.length > 0) {
+        // Consolidate into section blocks
+        let targetSection = sections.find(s => s.name === currentSection);
+        if (!targetSection) {
+          targetSection = { name: currentSection, composition: [] };
+          sections.push(targetSection);
+        }
+
+        for (const item of findings) {
+          if (!targetSection.composition.some(c => c.fiber === item.fiber)) {
+            targetSection.composition.push(item);
+          }
+        }
+      }
+    }
+
+    return sections.length > 0 ? sections : null;
+  }
+
+  /**
+   * 5. Shadow DOM UI Injection (Encapsulated Styles)
+   */
+  function renderBadge(sections) {
+    let host = document.getElementById('fabric-detector-root');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'fabric-detector-root';
+      document.body.appendChild(host);
+    }
+
+    const shadow = host.shadowRoot || host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = ''; // Clear previous
+
+    const style = document.createElement('style');
+    style.textContent = `
+      :host {
+        all: initial;
+      }
+      .fabric-card {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 2147483647;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #ffffff;
+        color: #1f2937;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        width: 280px;
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+        transition: all 0.2s ease;
+      }
+      .card-header {
+        background: #0f172a;
+        color: #ffffff;
+        padding: 10px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .close-btn {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 18px;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+      }
+      .close-btn:hover {
+        color: #ffffff;
+      }
+      .card-body {
+        padding: 12px 14px;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+      .section-group {
+        margin-bottom: 10px;
+      }
+      .section-group:last-child {
+        margin-bottom: 0;
+      }
+      .section-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #64748b;
+        margin-bottom: 6px;
+        letter-spacing: 0.05em;
+      }
+      .comp-item {
+        margin-bottom: 6px;
+      }
+      .comp-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 3px;
+      }
+      .fiber-name {
+        text-transform: capitalize;
+      }
+      .bar-track {
+        height: 6px;
+        background: #f1f5f9;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 3px;
+      }
+      .fill-natural { background: #10b981; }
+      .fill-synthetic { background: #3b82f6; }
+      .fill-delicate { background: #f59e0b; }
+    `;
+    shadow.appendChild(style);
+
+    const card = document.createElement('div');
+    card.className = 'fabric-card';
+
+    let bodyContent = '';
+    const naturalFibers = ['cotton', 'wool', 'silk', 'linen', 'cashmere', 'merino wool', 'hemp'];
+
+    sections.forEach(sec => {
+      bodyContent += `<div class="section-group">`;
+      if (sections.length > 1 || sec.name !== 'General') {
+        bodyContent += `<div class="section-title">${sec.name}</div>`;
+      }
+
+      sec.composition.forEach(item => {
+        const fillClass = naturalFibers.includes(item.fiber) ? 'fill-natural' : 'fill-synthetic';
+        bodyContent += `
+          <div class="comp-item">
+            <div class="comp-meta">
+              <span class="fiber-name">${item.fiber}</span>
+              <span>${item.percentage}%</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill ${fillClass}" style="width: ${item.percentage}%"></div>
+            </div>
+          </div>
+        `;
+      });
+      bodyContent += `</div>`;
+    });
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span>Fabric Composition</span>
+        <button class="close-btn" id="close-card">&times;</button>
+      </div>
+      <div class="card-body">
+        ${bodyContent}
+      </div>
+    `;
+
+    shadow.appendChild(card);
+
+    shadow.getElementById('close-card').addEventListener('click', () => {
+      host.remove();
+    });
+
+    // Notify background script of primary detected fiber percentage
+    const primaryPct = sections[0]?.composition[0]?.percentage || 0;
+    chrome.runtime.sendMessage({ type: 'FABRIC_DETECTED', count: primaryPct });
+  }
+
+  /**
+   * 6. Pipeline Coordinator
+   */
+  function inspectPage() {
+    // 1. Try structured data first
+    let rawText = extractFromJsonLd();
+    let parsed = parseComposition(rawText);
+
+    // 2. Try site-specific adapter if JSON-LD missing or lacked composition
+    if (!parsed) {
+      rawText = extractFromAdapter();
+      parsed = parseComposition(rawText);
+    }
+
+    // 3. Try global generic search
+    if (!parsed) {
+      rawText = extractFromGenericDOM();
+      parsed = parseComposition(rawText);
+    }
+
+    if (parsed) {
+      renderBadge(parsed);
+    } else {
+      const root = document.getElementById('fabric-detector-root');
+      if (root) root.remove();
+      chrome.runtime.sendMessage({ type: 'FABRIC_NOT_FOUND' });
+    }
+  }
+
+  /**
+   * 7. SPA Navigation and Swatch Watcher
+   */
+  let lastHref = location.href;
+  let debounceTimeout = null;
+
+  const observer = new MutationObserver(() => {
+    // Trigger on client-side route changes
+    if (location.href !== lastHref) {
+      lastHref = location.href;
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(inspectPage, 800);
+      return;
+    }
+
+    // Debounce DOM updates (swatch selections or asynchronous hydration)
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+      // Only re-inspect if our UI isn't currently mounted or if URL changed
+      if (!document.getElementById('fabric-detector-root')) {
+        inspectPage();
+      }
+    }, 1500);
   });
 
-  // --- Strategy 2: "Top Highlights" div under title ---
-  if (materialsFound.length === 0) {
-    const highlights = doc.querySelectorAll("#productOverview_feature_div .a-row, div[data-feature-name='productOverview'] .a-row");
-    highlights.forEach((row) => {
-      const text = row.innerText.toLowerCase();
-      if (text.includes("fabric") || text.includes("material")) {
-        const val = row.querySelector(".a-span7, span:last-child")?.innerText.trim();
-        if (val) materialsFound.push(val);
-      }
-    });
-  }
+  observer.observe(document.body, { childList: true, subtree: true });
 
-  // --- Strategy 3: Bullet points fallback (looking for "95% Cotton" or "Material: ...") ---
-  if (materialsFound.length === 0) {
-    const bullets = doc.querySelectorAll("#feature-bullets li, #detailBullets_feature_div li");
-    
-    bullets.forEach((bullet) => {
-      const text = bullet.innerText;
-
-      // Regex for percentages: e.g. "95% Cotton", "80% Polyester, 20% Elastane"
-      const percentMatches = text.match(/(\d{1,3}%\s*[A-Za-z\s]+)/gi);
-      if (percentMatches) {
-        materialsFound.push(...percentMatches.map(m => m.trim()));
-      } else if (text.toLowerCase().includes("material:")) {
-        // e.g. "Material: Made from ultra-soft..." -> extract first sentence
-        const matSentence = text.split(":")[1]?.split(".")[0]?.trim();
-        if (matSentence) materialsFound.push(matSentence);
-      }
-    });
-  }
-
-  // Deduplicate and join results
-  if (materialsFound.length > 0) {
-    const uniqueMaterials = [...new Set(materialsFound)];
-    return uniqueMaterials.join(" • ");
-  }
-
-  return "Fabric info not found";
-}
-
-// --- 2. Tooltip UI Logic ---
-let tooltipEl = null;
-
-function createTooltip() {
-  tooltipEl = document.createElement("div");
-  tooltipEl.className = "fabric-tooltip-card";
-  tooltipEl.style.display = "none";
-  document.body.appendChild(tooltipEl);
-}
-
-function showTooltip(e, text) {
-  if (!tooltipEl) createTooltip();
-  tooltipEl.innerHTML = `<div class="fabric-tooltip-header">🧵 Textile Breakdown</div><div>${text}</div>`;
-  tooltipEl.style.display = "block";
-  
-  // Position near cursor
-  tooltipEl.style.left = `${e.pageX + 15}px`;
-  tooltipEl.style.top = `${e.pageY + 15}px`;
-}
-
-function hideTooltip() {
-  if (tooltipEl) tooltipEl.style.display = "none";
-}
-
-// --- 3. Fetcher for Search Result Cards ---
-async function handleCardHover(e, cardLink) {
-  const url = cardLink.href;
-  if (!url) return;
-
-  if (fabricCache.has(url)) {
-    showTooltip(e, fabricCache.get(url));
-    return;
-  }
-
-  showTooltip(e, "Loading fabric details...");
-
-  try {
-    const res = await fetch(url);
-    const htmlText = await res.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlText, "text/html");
-
-    const fabricInfo = parseFabricFromHTML(doc);
-    fabricCache.set(url, fabricInfo);
-    
-    // Update tooltip text if user is still hovering
-    if (tooltipEl && tooltipEl.style.display === "block") {
-      showTooltip(e, fabricInfo);
-    }
-  } catch (err) {
-    showTooltip(e, "Could not fetch fabric details.");
-  }
-}
-
-// --- 4. Main Event Listener Setup ---
-function init() {
-  // A. If on a main Product Page
-  const mainTitle = document.getElementById("productTitle");
-  if (mainTitle) {
-    const fabricInfo = parseFabricFromHTML(document);
-    if (fabricInfo !== "Fabric info not found") {
-      mainTitle.addEventListener("mousemove", (e) => showTooltip(e, fabricInfo));
-      mainTitle.addEventListener("mouseleave", hideTooltip);
-    }
-  }
-
-  // B. Search Cards & Recommendation Grids
-  document.addEventListener("mouseover", (e) => {
-    // Find closest link tag on hovered item
-    const link = e.target.closest("a.a-link-normal, a[href*='/dp/']");
-    if (link && !link.dataset.fabricListener) {
-      link.dataset.fabricListener = "true"; // prevent duplicate binding
-
-      link.addEventListener("mousemove", (evt) => handleCardHover(evt, link));
-      link.addEventListener("mouseleave", hideTooltip);
-    }
-  });
-}
-
-// Run after DOM loads
-setTimeout(init, 1000);
+  // Initial execution
+  inspectPage();
+})();
