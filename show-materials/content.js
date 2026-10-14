@@ -272,7 +272,8 @@
         'div[data-testid="fabric-care-mfe"]', //[cite: 20]
         '#details-accordion-panel-id' //[cite: 20]
       ]
-    };
+    }
+  };
  
   /**
    * 1. Schema / JSON-LD Extraction
