@@ -1,14 +1,60 @@
 {
   "manifest_version": 3,
-  "name": "Amazon Fabric Detector",
-  "version": "1.0",
-  "description": "Displays textile composition on hover over Amazon clothing items.",
-  "permissions": ["activeTab"],
+  "name": "Fabric Composition Inspector",
+  "version": "1.0.0",
+  "description": "Automatically extracts fabric & material composition across major clothing retailers.",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.amazon.com/*",
+    "*://*.macys.com/*",
+    "*://*.ae.com/*",
+    "*://*.aeropostale.com/*",
+    "*://*.hottopic.com/*",
+    "*://*.target.com/*",
+    "*://*.walmart.com/*",
+    "*://*.gap.com/*",
+    "*://*.oldnavy.gap.com/*",
+    "*://*.bananarepublic.gap.com/*",
+    "*://*.nordstrom.com/*",
+    "*://*.zara.com/*",
+    "*://*.shein.com/*",
+    "*://*.asos.com/*"
+  ],
+  "action": {
+    "default_title": "Fabric Composition Inspector"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://*.amazon.com/*", "https://*.amazon.co.uk/*", "https://*.amazon.ca/*"],
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.macys.com/*",
+        "*://*.ae.com/*",
+        "*://*.aeropostale.com/*",
+        "*://*.hottopic.com/*",
+        "*://*.target.com/*",
+        "*://*.walmart.com/*",
+        "*://*.gap.com/*",
+        "*://*.oldnavy.gap.com/*",
+        "*://*.bananarepublic.gap.com/*",
+        "*://*.nordstrom.com/*",
+        "*://*.zara.com/*",
+        "*://*.shein.com/*",
+        "*://*.asos.com/*"
+      ],
       "js": ["content.js"],
-      "css": ["styles.css"]
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
