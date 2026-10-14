@@ -22,7 +22,7 @@
 
   const PART_PREFIXES = [
     'shell', 'body', 'lining', 'fill', 'padding', 'trim',
-    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff', 'hood', 'main'
+    'pocket', 'pocketing', 'rib', 'collar', 'sleeve', 'cuff', 'hood', 'main', 'piece 1', 'piece 2', 'piece 3'
   ];
 
   // Retailer-specific DOM targets
