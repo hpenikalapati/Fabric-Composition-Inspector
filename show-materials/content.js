@@ -142,8 +142,7 @@
         'div[class*="fds_panel_details-content"]',
         '#pdp-product-info-container'
       ]
-    }
-  },
+    },
   
   // Nordstrom & Nordstrom Rack
   'nordstrom.com': {
