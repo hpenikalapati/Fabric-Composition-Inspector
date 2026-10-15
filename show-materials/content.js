@@ -24,7 +24,8 @@
   ];
 
   const FIBER_LIST = [...NATURAL_FIBERS, ...SEMI_SYNTHETIC_FIBERS, ...SYNTHETIC_FIBERS];
-  const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
+
+  const DESCRIPTOR_WORDS = 'recycled|organic|pima|supima|raw|virgin';
 
   const SECTION_HEADERS = [
     'outer shell', 'shell', 'upper', 'body and lining', 'lining', 'body', 
@@ -273,8 +274,9 @@
         }
       }
 
+      // Captures optional descriptor + fiber name (e.g., "recycled cotton" or "cotton")
       const lineRegex = new RegExp(
-        `(\\d{1,3})%\\s*(?:of\\s+)?${DESCRIPTORS}(${fiberPattern})|${DESCRIPTORS}(${fiberPattern})\\s*[:\\-]?\\s*(\\d{1,3})%`,
+        `(\\d{1,3})%\\s*(?:of\\s+)?((?:(?:${DESCRIPTOR_WORDS})\\s+)?(?:${fiberPattern}))|((?:(?:${DESCRIPTOR_WORDS})\\s+)?(?:${fiberPattern}))\\s*[:\\-]?\\s*(\\d{1,3})%`,
         'gi'
       );
 
@@ -282,7 +284,7 @@
       const findings = [];
       while ((match = lineRegex.exec(line)) !== null) {
         const percentage = parseInt(match[1] || match[4], 10);
-        const fiber = (match[2] || match[3]).toLowerCase();
+        const fiber = (match[2] || match[3]).replace(/\s+/g, ' ').trim().toLowerCase();
 
         if (percentage > 0 && percentage <= 100) {
           findings.push({ fiber, percentage });
@@ -296,9 +298,17 @@
           sections.push(targetSection);
         }
 
-        for (const item of findings) {
-          if (!targetSection.composition.some(c => c.fiber === item.fiber)) {
-            targetSection.composition.push(item);
+        // Prevent duplicate scraping of the exact same block on the page
+        // by only adding if the section total is currently < 100%
+        const currentTotal = targetSection.composition.reduce((sum, item) => sum + item.percentage, 0);
+        if (currentTotal < 100) {
+          for (const item of findings) {
+            const existing = targetSection.composition.find(c => c.fiber === item.fiber);
+            if (!existing) {
+              targetSection.composition.push(item);
+            } else if (currentTotal + item.percentage <= 100) {
+              existing.percentage += item.percentage;
+            }
           }
         }
       }
@@ -311,6 +321,7 @@
 
     return sections.length > 0 ? sections : null;
   }
+
 
   // --- 4-LAYER EXTRACTION ENGINE ---
 
