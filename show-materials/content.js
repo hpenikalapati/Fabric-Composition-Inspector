@@ -6,13 +6,22 @@
 
   console.log('[Fabric Inspector] Injected into:', window.location.hostname);
 
-  const FIBER_LIST = [
-    'cotton', 'polyester', 'spandex', 'elastane', 'rayon', 'viscose',
-    'modal', 'nylon', 'polyamide', 'acrylic', 'linen', 'flax', 'wool',
-    'merino wool', 'cashmere', 'silk', 'lyocell', 'tencel', 'polyurethane',
-    'leather', 'suede', 'down', 'feather', 'alpaca', 'mohair', 'hemp', 
-    'jute', 'metallic'
+  // Fiber Classification
+  const NATURAL_FIBERS = [
+    'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 
+    'linen', 'flax', 'hemp', 'jute', 'alpaca', 'mohair', 'down', 'feather', 'leather', 'suede'
   ];
+
+  const SEMI_SYNTHETIC_FIBERS = [
+    'viscose', 'rayon', 'modal', 'lyocell', 'tencel'
+  ];
+
+  const SYNTHETIC_FIBERS = [
+    'polyester', 'spandex', 'elastane', 'nylon', 'polyamide', 
+    'acrylic', 'polyurethane', 'metallic'
+  ];
+
+  const FIBER_LIST = [...NATURAL_FIBERS, ...SEMI_SYNTHETIC_FIBERS, ...SYNTHETIC_FIBERS];
 
   const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
 
@@ -406,8 +415,8 @@
           width: 280px;
           overflow: hidden;
           border: 1px solid #e5e7eb;
-          transition: transform 0.2s ease, opacity 0.2s ease;
           box-sizing: border-box;
+          pointer-events: auto;
         }
         .fabric-card *, .fabric-card *::before, .fabric-card *::after {
           box-sizing: border-box;
@@ -478,12 +487,15 @@
         .bar-fill {
           height: 100%;
           border-radius: 3px;
+          transition: width 0.3s ease;
         }
-        .fill-natural { background: #1ce8a9; }
-        .fill-synthetic { background: #f7391b; }
-        .fill-delicate { background: #4facf7; }
 
-        /* Loading Skeleton Animation */
+        /* Fiber Color Hierarchy */
+        .fill-natural { background: #1ce8a9; }
+        .fill-semi-synthetic { background: #F5CF27; }
+        .fill-synthetic { background: #f7391b; }
+
+        /* Loading Skeleton */
         .loading-container {
           padding: 14px;
           display: flex;
@@ -527,9 +539,16 @@
     return shadow;
   }
 
+  function getFiberFillClass(fiberName) {
+    const f = fiberName.toLowerCase();
+    if (SEMI_SYNTHETIC_FIBERS.includes(f)) return 'fill-semi-synthetic';
+    if (NATURAL_FIBERS.includes(f)) return 'fill-natural';
+    return 'fill-synthetic';
+  }
+
   // --- RENDER FUNCTIONS ---
 
-  function renderLoading(title = 'Inspecting product...') {
+  function renderLoading(title = 'Analyzing composition...') {
     const shadow = getOrCreateShadowRoot();
     const existingCard = shadow.querySelector('.fabric-card');
     if (existingCard) existingCard.remove();
@@ -547,7 +566,7 @@
           <span>${title}</span>
         </div>
         <div class="skeleton-bar" style="width: 80%;"></div>
-        <div class="skeleton-bar" style="width: 60%;"></div>
+        <div class="skeleton-bar" style="width: 55%;"></div>
       </div>
     `;
 
@@ -566,7 +585,6 @@
     card.className = 'fabric-card';
 
     let bodyContent = '';
-    const naturalFibers = ['cotton', 'wool', 'silk', 'linen', 'cashmere', 'merino wool', 'hemp'];
 
     sections.forEach(sec => {
       bodyContent += `<div class="section-group">`;
@@ -575,7 +593,7 @@
       }
 
       sec.composition.forEach(item => {
-        const fillClass = naturalFibers.includes(item.fiber) ? 'fill-natural' : 'fill-synthetic';
+        const fillClass = getFiberFillClass(item.fiber);
         bodyContent += `
           <div class="comp-item">
             <div class="comp-meta">
@@ -642,18 +660,26 @@
     }
   }
 
-  // --- HOVER URL RESOLVER (MATCHES BROWSER STATUS BAR LINK) ---
+  // --- PRECISE URL RESOLVER FOR HOVER ---
 
   function resolveHoveredProductUrl(el) {
     if (!el) return null;
 
-    // Direct anchor link or child of anchor link
-    const anchor = el.closest('a[href]');
-    if (!anchor || !anchor.href) return null;
+    // Climb ancestors to find the clickable product link
+    let curr = el;
+    let anchor = null;
+    while (curr && curr !== document.body) {
+      if (curr.tagName === 'A' && curr.href) {
+        anchor = curr;
+        break;
+      }
+      curr = curr.parentElement;
+    }
 
+    if (!anchor || !anchor.href) return null;
     const url = anchor.href;
 
-    // 1. Amazon: handles direct /dp/ URLs and search redirect links (/slredirect)
+    // Amazon handling
     if (url.includes('amazon.com')) {
       if (url.includes('/slredirect')) {
         const decoded = decodeURIComponent(url);
@@ -664,17 +690,11 @@
       if (dpMatch) return `https://www.amazon.com/dp/${dpMatch[1]}`;
     }
 
-    // 2. Generic Product Retail links
-    // Ignore internal page anchors, account links, cart, checkout, or identical current URL
-    if (
-      !url.includes('#') &&
-      !url.includes('javascript:') &&
-      !url.includes('/cart') &&
-      !url.includes('/checkout') &&
-      !url.includes('/account') &&
-      !url.includes('/signin') &&
-      url !== window.location.href
-    ) {
+    // Generic retail handling (filters out non-product anchors)
+    const ignoredPatterns = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login'];
+    const isIgnored = ignoredPatterns.some(p => url.includes(p));
+
+    if (!isIgnored && url !== window.location.href) {
       return url;
     }
 
@@ -717,22 +737,21 @@
     if (!url || url === currentHoverUrl) return;
     currentHoverUrl = url;
 
-    // Check memory cache for instant render
     if (hoverCache.has(url)) {
       const cached = hoverCache.get(url);
       if (cached) renderBadge(cached);
       return;
     }
 
-    // Display loading state with spinner
+    // Display skeleton loading badge immediately
     renderLoading('Analyzing composition...');
 
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
-      // Discard response if user has already moved cursor to a different link
+      // Ignore if user has moved on to hover over another product
       if (currentHoverUrl !== url) return;
 
       if (chrome.runtime.lastError || !res || !res.success) {
-        console.warn('[Fabric Inspector] Hover request error:', chrome.runtime.lastError?.message || res?.error);
+        console.warn('[Fabric Inspector] Background fetch failed for URL:', url);
         return;
       }
 
@@ -745,7 +764,6 @@
       if (parsed) {
         renderBadge(parsed);
       } else {
-        // Fallback info if the hovered product has no materials listed
         renderLoading('No material breakdown found');
         setTimeout(() => {
           if (currentHoverUrl === url) {
@@ -756,11 +774,11 @@
     });
   }
 
-  // --- MOUSEOVER HOVER LISTENER ---
+  // --- POINTER / MOUSEOVER LISTENER ---
 
   let hoverTimer = null;
-  document.addEventListener('mouseover', (e) => {
-    // Ignore hovering over the inspector's own badge
+
+  function onPointerMove(e) {
     if (e.target && e.target.closest('#fabric-detector-root')) return;
 
     clearTimeout(hoverTimer);
@@ -768,20 +786,23 @@
       const target = e.target;
       if (!target) return;
 
-      // 1. Swatches on the active product page
+      // 1. Swatches on detail pages
       const swatch = target.closest('button, a, label, li, div[class*="swatch"], [data-testid*="swatch"]');
       if (swatch) {
         inspectPage(document);
         return;
       }
 
-      // 2. Product title / image links that resolve to a product URL (as seen in browser status bar)
+      // 2. Clickable link to product (resolves anchor regardless of nested spans/tooltips)
       const targetUrl = resolveHoveredProductUrl(target);
       if (targetUrl) {
         executeHoverFetch(targetUrl);
       }
-    }, 150); // 150ms hover trigger provides immediate response
-  });
+    }, 120);
+  }
+
+  // Attach using pointerover for faster hit-testing across complex CSS layers
+  document.addEventListener('pointerover', onPointerMove, { passive: true });
 
   // --- ROUTE & HYDRATION OBSERVER ---
 
@@ -799,7 +820,6 @@
 
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
-      // Only re-inspect page if not actively displaying a hover result
       if (!currentHoverUrl) {
         inspectPage(document);
       }
