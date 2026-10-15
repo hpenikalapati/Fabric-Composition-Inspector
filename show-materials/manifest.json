@@ -57,13 +57,34 @@
         "*://*.abercrombie.com/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["styles.css"],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.macys.com/*",
+        "*://*.ae.com/*",
+        "*://*.aeropostale.com/*",
+        "*://*.hottopic.com/*",
+        "*://*.target.com/*",
+        "*://*.walmart.com/*",
+        "*://*.gap.com/*",
+        "*://*.oldnavy.gap.com/*",
+        "*://*.bananarepublic.gap.com/*",
+        "*://*.nordstrom.com/*",
+        "*://*.zara.com/*",
+        "*://*.shein.com/*",
+        "*://*.asos.com/*",
+        "*://*.jcrew.com/*",
+        "*://*.uniqlo.com/*",
+        "*://*.hm.com/*",
+        "*://*.urbanoutfitters.com/*",
+        "*://*.hollisterco.com/*",
+        "*://*.abercrombie.com/*"
+      ]
     }
   ]
 }
