@@ -393,16 +393,38 @@
 
   function extractAmazonDirect(doc) {
     if (!doc) return null;
+
+    // 1. Check Amazon's Softlines / Clothing Facts expander and Overview tables
+    const containers = doc.querySelectorAll(
+      '#productFactsDesktopExpander, #productFactsDesktop_feature_div, #productOverview_feature_div, #detailBullets_feature_div, #featurebullets_feature_div, #voyager-ns-desktop-side-sheet-content'
+    );
+
+    const collected = [];
+
+    // Extract table rows with explicit spacing between <th>/<td> cells
     const rows = doc.querySelectorAll(
-      '#productOverview_feature_div tr, #voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #detailBullets_feature_div li'
+      '#productOverview_feature_div tr, #productFactsDesktopExpander tr, table.prodDetTable tr'
     );
     for (const row of rows) {
-      const text = (row.innerText || row.textContent || '').toLowerCase();
-      if (text.includes('fabric') || text.includes('material')) {
-        return row.innerText || row.textContent;
+      const cells = Array.from(row.querySelectorAll('th, td, span')).map(c => (c.textContent || '').trim()).filter(Boolean);
+      const rowText = cells.join(' : ');
+      if (/fabric|material|composition|cotton|polyester|viscose|rayon|spandex|nylon|wool|linen/i.test(rowText)) {
+        collected.push(rowText);
       }
     }
-    return null;
+
+    // Extract bullet points and grid divs (used on Amazon fashion templates)
+    for (const container of containers) {
+      const items = container.querySelectorAll('li, div.a-fixed-left-grid-inner, div.a-row, span.a-list-item');
+      for (const item of items) {
+        const text = (item.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text.length < 300 && text.includes('%')) {
+          collected.push(text);
+        }
+      }
+    }
+
+    return collected.length > 0 ? collected.join(' \n ') : null;
   }
 
   function inspectDocument(doc = document, targetUrl = window.location.href) {
