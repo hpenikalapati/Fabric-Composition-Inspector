@@ -1,7 +1,7 @@
 // background.js
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Fabric Inspector] Service worker active.');
+  console.log('[Fabric Inspector] Background service ready.');
 });
 
 const cache = new Map();
@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })
       .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP status ${res.status}`);
         return res.text();
       })
       .then(html => {
@@ -39,10 +39,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.warn('[Fabric Inspector] Background fetch failed for:', url, err);
+        console.warn('[Fabric Inspector] Fetch failed for:', url, err);
         sendResponse({ success: false, error: err.message });
       });
 
-    return true; // Keep channel open
+    return true; // Keep message channel open for async response
   }
 });
