@@ -4,11 +4,9 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('[Fabric Inspector] Service Worker installed.');
 });
 
-// Cache HTML fetches in background memory to avoid duplicate requests
-const fetchCache = new Map();
+const cache = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // 1. Badge counter updates
   if (message.type === 'FABRIC_DETECTED' && sender.tab) {
     const tabId = sender.tab.id;
     const count = message.count || 0;
@@ -22,16 +20,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.action.setBadgeText({ tabId: sender.tab.id, text: '' });
   }
 
-  // 2. Offload Hover Fetching to bypass Content Script CORS / Captcha limitations
   if (message.type === 'FETCH_HOVER_HTML') {
-    const targetUrl = message.url;
+    const { url } = message;
 
-    if (fetchCache.has(targetUrl)) {
-      sendResponse({ success: true, html: fetchCache.get(targetUrl) });
+    if (cache.has(url)) {
+      sendResponse({ success: true, html: cache.get(url) });
       return true;
     }
 
-    fetch(targetUrl, {
+    fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'text/html,application/xhtml+xml',
@@ -39,18 +36,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })
       .then(res => {
-        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
       .then(html => {
-        fetchCache.set(targetUrl, html);
+        cache.set(url, html);
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.error('[Fabric Inspector] Background fetch failed:', err);
         sendResponse({ success: false, error: err.message });
       });
 
-    return true; // Keep message channel open for async response
+    return true; // Keep channel open
   }
 });
