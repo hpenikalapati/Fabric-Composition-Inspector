@@ -14,9 +14,11 @@
 
   const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
 
-  const STRICT_PREFIXES = [
-    'body and lining', 'shell', 'body', 'lining', 'fill', 'padding', 'trim',
-    'pocket', 'pocketing', 'rib', 'cuff', 'collar', 'main',
+  // Section headers including multi-line labels seen across Zara, H&M, etc.
+  const SECTION_HEADERS = [
+    'outer shell', 'shell', 'upper', 'body and lining', 'lining', 'body', 
+    'sleeves', 'sleeve', 'filling', 'fill', 'padding', 'trim', 
+    'pocketing', 'pockets', 'rib', 'cuff', 'collar', 'hood', 'main',
     'piece 1', 'piece 2', 'piece 3'
   ];
 
@@ -224,7 +226,7 @@
     }
   };
 
-  // --- PARSERS & EXTRACTORS ---
+  // --- STATE-MACHINE COMPOSITION PARSER ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -233,14 +235,28 @@
     const lines = rawText.split(/\r?\n|;|\u2022|·|<br\s*\/?>/).map(l => l.trim()).filter(Boolean);
     const sections = [];
 
+    let currentSection = 'General';
+
     for (const line of lines) {
+      const cleanLine = line.toLowerCase().replace(/[:\-]/g, '').trim();
+
+      // Guard against common marketing descriptors containing sleeve
       const isSleeveDescription = /long sleeve|short sleeve|sleeveless|cuff sleeve/i.test(line);
 
-      let currentSection = 'General';
+      // Check if line is a standalone section header (e.g., "OUTER SHELL", "LINING", "SLEEVES")[cite: 32]
+      const matchedHeader = SECTION_HEADERS.find(h => cleanLine === h || cleanLine.startsWith(h + ' '));
+      const hasPercentages = /\d{1,3}%/.test(line);
+
+      if (matchedHeader && !hasPercentages && !isSleeveDescription) {
+        currentSection = matchedHeader.replace(/\b\w/g, c => c.toUpperCase());
+        continue;
+      }
+
+      // Check inline section prefix like "Shell: 50% Wool"
       if (!isSleeveDescription) {
-        const partMatch = line.match(new RegExp(`^(${STRICT_PREFIXES.join('|')})\\s*[:\\-]`, 'i'));
-        if (partMatch) {
-          currentSection = partMatch[1].charAt(0).toUpperCase() + partMatch[1].slice(1).toLowerCase();
+        const inlinePrefix = cleanLine.match(new RegExp(`^(${SECTION_HEADERS.join('|')})\\s*[:\\-]`, 'i'));
+        if (inlinePrefix) {
+          currentSection = inlinePrefix[1].replace(/\b\w/g, c => c.toUpperCase());
         }
       }
 
@@ -275,8 +291,16 @@
       }
     }
 
+    // Clean up empty general sections if named sections were identified[cite: 32]
+    if (sections.length > 1) {
+      const generalIndex = sections.findIndex(s => s.name === 'General' && s.composition.length === 0);
+      if (generalIndex > -1) sections.splice(generalIndex, 1);
+    }
+
     return sections.length > 0 ? sections : null;
   }
+
+  // --- EXTRACTION LAYERS ---
 
   function extractFromJsonLd() {
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
@@ -344,7 +368,7 @@
 
   function extractAmazonDirect() {
     const drawerRows = document.querySelectorAll(
-      '#voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #productOverview_feature_div table tr'
+      '#voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #productOverview_feature_div table tr'[cite: 1]
     );
     for (const row of drawerRows) {
       const text = row.innerText.toLowerCase();
@@ -357,7 +381,7 @@
     return null;
   }
 
-  // --- UI RENDERER ---
+  // --- SHADOW DOM UI RENDERER ---
 
   function renderBadge(sections) {
     let host = document.getElementById('fabric-detector-root');
@@ -557,9 +581,9 @@
     }
   }
 
-  // --- AMAZON ASIN HOVER FETCH (SEARCH GRIDS) ---
+  // --- UNIVERSAL BACKGROUND HOVER FETCHING ---
 
-  const asinCache = new Map();
+  const productUrlCache = new Map();
 
   function getAmazonAsin(el) {
     if (!el) return null;
@@ -577,16 +601,40 @@
     return null;
   }
 
-  async function fetchAndParseAsin(asin) {
-    if (asinCache.has(asin)) {
-      const cachedData = asinCache.get(asin);
+  function getProductUrl(el) {
+    if (!el) return null;
+
+    if (window.location.hostname.includes('amazon.com')) {
+      const asin = getAmazonAsin(el);
+      if (asin) return `https://www.amazon.com/dp/${asin}`;
+    }
+
+    const anchor = el.closest('a[href]') || el.querySelector('a[href]');
+    if (anchor && anchor.href) {
+      const href = anchor.href;
+      if (
+        !href.includes('#') && 
+        !href.includes('/cart') && 
+        !href.includes('/checkout') && 
+        !href.includes('/account') &&
+        href !== window.location.href
+      ) {
+        return href;
+      }
+    }
+    return null;
+  }
+
+  async function fetchAndParseUrl(url) {
+    if (productUrlCache.has(url)) {
+      const cachedData = productUrlCache.get(url);
       if (cachedData) renderBadge(cachedData);
       return;
     }
 
     try {
-      console.log('[Fabric Inspector] Fetching ASIN in background:', asin);
-      const res = await fetch(`https://www.amazon.com/dp/${asin}`, {
+      console.log('[Fabric Inspector] Background fetching product URL:', url);
+      const res = await fetch(url, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -602,32 +650,24 @@
       const doc = parser.parseFromString(htmlText, 'text/html');
 
       let rawText = '';
-      const tables = doc.querySelectorAll(
-        '#voyager-ns-desktop-side-sheet-content table.prodDetTable, #productOverview_feature_div, #detailBullets_feature_div, #technicalSpecifications_section_1'
-      );
-      for (const t of tables) {
-        rawText += (t.innerText || t.textContent) + ' \n ';
+      const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+      for (const s of scripts) {
+        rawText += s.textContent + ' \n ';
       }
 
-      if (!rawText.trim()) {
-        const bullets = doc.querySelector('#featurebullets_feature_div');
-        if (bullets) rawText += bullets.innerText + ' \n ';
-      }
+      rawText += ' \n ' + extractFromAdapter(doc);
 
       if (!rawText.trim()) {
-        const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-        for (const s of scripts) {
-          rawText += s.textContent + ' \n ';
-        }
+        rawText = extractFromGenericDOM(doc);
       }
 
       const parsed = parseComposition(rawText);
-      asinCache.set(asin, parsed);
+      productUrlCache.set(url, parsed);
       if (parsed) {
         renderBadge(parsed);
       }
     } catch (err) {
-      console.error('[Fabric Inspector] ASIN fetch error:', err);
+      console.debug('[Fabric Inspector] Fetch error:', err);
     }
   }
 
@@ -642,22 +682,25 @@
       const target = e.target;
       if (!target) return;
 
-      const hostname = window.location.hostname;
-
-      if (hostname.includes('amazon.com')) {
-        const asin = getAmazonAsin(target);
-        const currentUrlAsin = window.location.pathname.match(/\/dp\/([A-Z0-9]{10})/i)?.[1];
-        if (asin && asin !== currentUrlAsin) {
-          fetchAndParseAsin(asin);
-          return;
-        }
-      }
-
+      // 1. Swatches on detail pages
       const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
       if (swatch) {
         inspectPage(document);
+        return;
       }
-    }, 150);
+
+      // 2. Product tiles on catalog/search grids (Works on Amazon, Zara, ASOS, etc.)[cite: 24, 28]
+      const productCard = target.closest(
+        'article, .product-card, [data-component-type="s-search-result"], .c-pwa-tile-grid__item, div[class*="product-grid"], li[class*="product"]'
+      ) || target.closest('a');
+
+      if (productCard) {
+        const url = getProductUrl(productCard);
+        if (url && url !== window.location.href) {
+          fetchAndParseUrl(url);
+        }
+      }
+    }, 180);
   });
 
   // --- SPA ROUTE & DOM OBSERVER ---
@@ -683,7 +726,7 @@
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Initial runs
+  // Initial runs for client-side hydrated views
   inspectPage(document);
   setTimeout(() => inspectPage(document), 1000);
   setTimeout(() => inspectPage(document), 2500);
