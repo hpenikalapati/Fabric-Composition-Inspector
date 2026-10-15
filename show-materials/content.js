@@ -26,7 +26,7 @@
   const SECTION_HEADERS = [
     'outer shell', 'shell', 'upper', 'body and lining', 'lining', 'body', 
     'sleeves', 'sleeve', 'filling', 'fill', 'padding', 'trim', 
-    'pocketing', 'pockets', 'pocket', 'pocket bag', 'rib', 'cuff', 'collar', 'hood', 'main',
+    'pocketing', 'pockets', 'rib', 'cuff', 'collar', 'hood', 'main',
     'piece 1', 'piece 2', 'piece 3'
   ];
 
@@ -177,7 +177,7 @@
     }
   };
 
-  // --- PARSER ENGINE ---
+  // --- STATE-MACHINE COMPOSITION PARSER ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -345,16 +345,41 @@
     return parsed;
   }
 
-  // --- MOUNT SHADOW DOM CONTAINER ---
+  // --- DYNAMIC POSITIONING AND UI CONTAINER ---
+
+  let mousePos = { x: window.innerWidth - 320, y: window.innerHeight - 340 };
+
+  window.addEventListener('mousemove', (e) => {
+    // Keep badge near cursor without falling off viewport edges
+    const cardWidth = 300;
+    const cardHeight = 260;
+
+    let posX = e.clientX + 16;
+    let posY = e.clientY + 16;
+
+    if (posX + cardWidth > window.innerWidth) {
+      posX = e.clientX - cardWidth - 16;
+    }
+    if (posY + cardHeight > window.innerHeight) {
+      posY = e.clientY - cardHeight - 16;
+    }
+
+    mousePos.x = Math.max(10, posX);
+    mousePos.y = Math.max(10, posY);
+  }, { passive: true });
 
   function getShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
     if (!host) {
       host = document.createElement('div');
       host.id = 'fabric-detector-root';
-      host.style.cssText = 'position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 2147483647 !important; pointer-events: auto !important; display: block !important;';
+      host.style.cssText = 'position: fixed !important; z-index: 2147483647 !important; pointer-events: none !important; display: block !important;';
       (document.body || document.documentElement).appendChild(host);
     }
+
+    // Update coordinates dynamically to track target
+    host.style.left = `${mousePos.x}px`;
+    host.style.top = `${mousePos.y}px`;
 
     let shadow = host.shadowRoot;
     if (!shadow) {
@@ -371,56 +396,57 @@
           color: #569481;
           border-radius: 12px;
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
-          width: 290px;
+          width: 280px;
           overflow: hidden;
           border: 1px solid #e5e7eb;
+          pointer-events: auto;
         }
         .card-header {
           background: #000000;
           color: #ffffff;
-          padding: 10px 14px;
+          padding: 8px 12px;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
         }
         .close-btn {
           background: none;
           border: none;
           color: #569481;
-          font-size: 18px;
+          font-size: 16px;
           cursor: pointer;
           line-height: 1;
         }
         .close-btn:hover { color: #ffffff; }
         .card-body {
-          padding: 12px 14px;
-          max-height: 320px;
+          padding: 10px 12px;
+          max-height: 280px;
           overflow-y: auto;
         }
-        .section-group { margin-bottom: 10px; }
+        .section-group { margin-bottom: 8px; }
         .section-group:last-child { margin-bottom: 0; }
         .section-title {
-          font-size: 11px;
+          font-size: 10px;
           text-transform: uppercase;
           font-weight: 700;
           color: #569481;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
           letter-spacing: 0.05em;
         }
-        .comp-item { margin-bottom: 6px; }
+        .comp-item { margin-bottom: 5px; }
         .comp-meta {
           display: flex;
           justify-content: space-between;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 500;
-          margin-bottom: 3px;
+          margin-bottom: 2px;
           color: #569481;
         }
         .fiber-name { text-transform: capitalize; }
         .bar-track {
-          height: 6px;
+          height: 5px;
           background: #f1f5f9;
           border-radius: 3px;
           overflow: hidden;
@@ -430,13 +456,13 @@
         .fill-semi-synthetic { background: #F5CF27; }
         .fill-synthetic { background: #f7391b; }
         .loading-container {
-          padding: 16px 14px;
+          padding: 12px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
         }
         .loading-label {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
           color: #569481;
           display: flex;
@@ -444,8 +470,8 @@
           gap: 8px;
         }
         .spinner {
-          width: 14px;
-          height: 14px;
+          width: 12px;
+          height: 12px;
           border: 2px solid #e5e7eb;
           border-top-color: #1ce8a9;
           border-radius: 50%;
@@ -453,9 +479,9 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .skeleton-bar {
-          height: 8px;
+          height: 6px;
           background: #e2e8f0;
-          border-radius: 4px;
+          border-radius: 3px;
         }
       `;
       shadow.appendChild(style);
@@ -493,7 +519,9 @@
     `;
 
     shadow.appendChild(card);
-    shadow.getElementById('close-card')?.addEventListener('click', () => card.remove());
+    shadow.getElementById('close-card')?.addEventListener('click', () => {
+      document.getElementById('fabric-detector-root')?.remove();
+    });
   }
 
   function renderBadge(sections) {
@@ -538,7 +566,9 @@
     `;
 
     shadow.appendChild(card);
-    shadow.getElementById('close-card')?.addEventListener('click', () => card.remove());
+    shadow.getElementById('close-card')?.addEventListener('click', () => {
+      document.getElementById('fabric-detector-root')?.remove();
+    });
 
     const primaryPct = sections[0]?.composition[0]?.percentage || 0;
     try {
@@ -546,55 +576,52 @@
     } catch (e) {}
   }
 
-  // --- PATH-TRAVERSING URL RESOLVER ---
+  // --- MULTI-STORE PRODUCT URL RESOLVER ---
 
-  function getProductUrlFromEvent(e) {
-    const path = e.composedPath ? e.composedPath() : [];
+  function extractProductUrlFromElement(target) {
+    if (!target) return null;
 
-    for (const el of path) {
-      if (!el || !el.getAttribute) continue;
-
-      // 1. Amazon Direct ASIN
-      if (el.hasAttribute('data-asin') && el.getAttribute('data-asin').length === 10) {
-        return `https://www.amazon.com/dp/${el.getAttribute('data-asin')}`;
+    // 1. Amazon direct tile ASIN
+    const asinElement = target.closest('[data-asin], [data-csa-c-item-id]');
+    if (asinElement) {
+      const asin = asinElement.getAttribute('data-asin') || asinElement.getAttribute('data-csa-c-item-id');
+      if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
+        return `https://www.amazon.com/dp/${asin.trim()}`;
       }
+    }
 
-      // 2. Product link anchor
-      if (el.tagName === 'A' && el.href) {
-        const href = el.href;
+    // 2. Climb tree for the clickable anchor
+    const anchor = target.closest('a[href]');
+    if (!anchor || !anchor.href) return null;
 
-        // Amazon redirect or direct
-        if (href.includes('amazon.com')) {
-          const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-          if (match) return `https://www.amazon.com/dp/${match[1]}`;
-        }
+    const href = anchor.href;
 
-        // Generic retail link filter
-        const badPatterns = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag'];
-        if (!badPatterns.some(p => href.toLowerCase().includes(p))) {
-          // If the link has an ID or points to an HTML product detail page
-          if (href.includes('.html') || href.includes('/p/') || href.includes('/product/') || href.includes('/dp/')) {
-            return href;
-          }
-          // Accept any clean product link
-          if (href.split('?')[0] !== window.location.href.split('?')[0]) {
-            return href;
-          }
-        }
-      }
+    // Amazon link
+    if (href.includes('amazon.com')) {
+      const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
+      if (match) return `https://www.amazon.com/dp/${match[1]}`;
+    }
+
+    // Hollister / Abercrombie / Retail product path matching
+    // Must contain /p/, /product/, or .html
+    const isPdpLink = href.includes('/p/') || href.includes('/product/') || href.includes('.html') || href.includes('/dp/');
+    const badWords = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag', '/category'];
+
+    if (isPdpLink && !badWords.some(w => href.toLowerCase().includes(w))) {
+      return href;
     }
 
     return null;
   }
 
-  // --- HOVER DISPATCHER ---
+  // --- HOVER PIPELINE & EVENT ATTACHMENT ---
 
   const hoverCache = new Map();
-  let activeHoverUrl = null;
+  let currentHoverUrl = null;
 
-  function handleHover(url) {
-    if (!url || url === activeHoverUrl) return;
-    activeHoverUrl = url;
+  function triggerHoverInspection(url) {
+    if (!url || url === currentHoverUrl) return;
+    currentHoverUrl = url;
 
     console.log('[Fabric Inspector] Target Hover URL:', url);
 
@@ -607,11 +634,16 @@
     renderLoading('Analyzing composition...');
 
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
-      if (activeHoverUrl !== url) return;
+      if (currentHoverUrl !== url) return;
 
       if (!res || !res.success || !res.html) {
-        console.warn('[Fabric Inspector] Background fetch failed for:', url, res?.error);
+        console.warn('[Fabric Inspector] Fetch failed for:', url, res?.error);
         renderLoading('No material breakdown found');
+        setTimeout(() => {
+          if (currentHoverUrl === url) {
+            document.getElementById('fabric-detector-root')?.remove();
+          }
+        }, 1500);
         return;
       }
 
@@ -626,43 +658,47 @@
       } else {
         renderLoading('No material breakdown found');
         setTimeout(() => {
-          if (activeHoverUrl === url) {
-            getShadowRoot().querySelector('.fabric-card')?.remove();
+          if (currentHoverUrl === url) {
+            document.getElementById('fabric-detector-root')?.remove();
           }
-        }, 1800);
+        }, 1500);
       }
     });
   }
 
-  // Mousemove listener with composedPath evaluation
-  let throttle = null;
-  window.addEventListener('mousemove', (e) => {
-    if (throttle) return;
-    throttle = setTimeout(() => { throttle = null; }, 50);
+  let hoverTimer = null;
 
-    const path = e.composedPath ? e.composedPath() : [];
-    if (path.some(el => el.id === 'fabric-detector-root')) return;
+  document.addEventListener('mouseover', (e) => {
+    const target = e.target;
+    if (!target || target.id === 'fabric-detector-root' || target.closest('#fabric-detector-root')) return;
 
-    // Check swatches on detail page
-    const swatch = path.find(el => el.matches && el.matches('button, a, label, li, div[class*="swatch"]'));
+    // Swatches on active page
+    const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
     if (swatch) {
       const parsed = inspectDocument(document, window.location.href);
       if (parsed) renderBadge(parsed);
       return;
     }
 
-    const url = getProductUrlFromEvent(e);
+    const url = extractProductUrlFromElement(target);
     if (url) {
-      handleHover(url);
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => triggerHoverInspection(url), 100);
     }
   }, { passive: true });
 
-  // Initial runs for product detail pages
-  const initialData = inspectDocument(document, window.location.href);
-  if (initialData) renderBadge(initialData);
+  // --- SAFE INITIAL EXECUTION (PDP ONLY) ---
+  // Only auto-inspect on initial load if the current page is an actual Product Detail Page
+  const currentPath = window.location.pathname;
+  const isDetailPage = currentPath.includes('/p/') || currentPath.includes('/dp/') || currentPath.includes('/product/') || currentPath.endsWith('.html');
 
-  setTimeout(() => {
-    const retryData = inspectDocument(document, window.location.href);
-    if (retryData) renderBadge(retryData);
-  }, 1200);
+  if (isDetailPage) {
+    const initialData = inspectDocument(document, window.location.href);
+    if (initialData) renderBadge(initialData);
+
+    setTimeout(() => {
+      const retryData = inspectDocument(document, window.location.href);
+      if (retryData) renderBadge(retryData);
+    }, 1200);
+  }
 })();
