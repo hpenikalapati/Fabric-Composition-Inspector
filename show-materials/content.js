@@ -14,7 +14,6 @@
 
   const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
 
-  // Section headers including multi-line labels seen across Zara, H&M, etc.
   const SECTION_HEADERS = [
     'outer shell', 'shell', 'upper', 'body and lining', 'lining', 'body', 
     'sleeves', 'sleeve', 'filling', 'fill', 'padding', 'trim', 
@@ -25,10 +24,10 @@
   const SITE_ADAPTERS = {
     'amazon.com': {
       selectors: [
+        '#productOverview_feature_div',
         '#voyager-ns-desktop-side-sheet-content table.prodDetTable',
-        '#productOverview_feature_div table',
-        '#technicalSpecifications_section_1',
         '#detailBullets_feature_div',
+        '#technicalSpecifications_section_1',
         '#featurebullets_feature_div'
       ]
     },
@@ -239,11 +238,8 @@
 
     for (const line of lines) {
       const cleanLine = line.toLowerCase().replace(/[:\-]/g, '').trim();
-
-      // Guard against common marketing descriptors containing sleeve
       const isSleeveDescription = /long sleeve|short sleeve|sleeveless|cuff sleeve/i.test(line);
 
-      // Check if line is a standalone section header (e.g., "OUTER SHELL", "LINING", "SLEEVES")[cite: 32]
       const matchedHeader = SECTION_HEADERS.find(h => cleanLine === h || cleanLine.startsWith(h + ' '));
       const hasPercentages = /\d{1,3}%/.test(line);
 
@@ -252,7 +248,6 @@
         continue;
       }
 
-      // Check inline section prefix like "Shell: 50% Wool"
       if (!isSleeveDescription) {
         const inlinePrefix = cleanLine.match(new RegExp(`^(${SECTION_HEADERS.join('|')})\\s*[:\\-]`, 'i'));
         if (inlinePrefix) {
@@ -291,7 +286,6 @@
       }
     }
 
-    // Clean up empty general sections if named sections were identified[cite: 32]
     if (sections.length > 1) {
       const generalIndex = sections.findIndex(s => s.name === 'General' && s.composition.length === 0);
       if (generalIndex > -1) sections.splice(generalIndex, 1);
@@ -302,8 +296,8 @@
 
   // --- EXTRACTION LAYERS ---
 
-  function extractFromJsonLd() {
-    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+  function extractFromJsonLd(contextDoc = document) {
+    const scripts = contextDoc.querySelectorAll('script[type="application/ld+json"]');
     const texts = [];
 
     for (const script of scripts) {
@@ -326,7 +320,7 @@
     return texts.join(' \n ');
   }
 
-  function extractFromAdapter(context = document) {
+  function extractFromAdapter(contextDoc = document) {
     const host = window.location.hostname.replace(/^www\./, '');
     const sortedKeys = Object.keys(SITE_ADAPTERS).sort((a, b) => b.length - a.length);
     const adapterKey = sortedKeys.find(domain => host.endsWith(domain));
@@ -334,13 +328,13 @@
     if (!adapterKey) return '';
     const adapter = SITE_ADAPTERS[adapterKey];
 
-    if (adapter.preAction) {
+    if (adapter.preAction && contextDoc === document) {
       try { adapter.preAction(); } catch (e) {}
     }
 
     const matches = [];
     for (const sel of adapter.selectors) {
-      const elements = context.querySelectorAll(sel);
+      const elements = contextDoc.querySelectorAll(sel);
       for (const el of elements) {
         if (el && el.innerText) {
           matches.push(el.innerText);
@@ -351,8 +345,8 @@
     return matches.join(' \n ');
   }
 
-  function extractFromGenericDOM(context = document) {
-    const candidateNodes = context.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
+  function extractFromGenericDOM(contextDoc = document) {
+    const candidateNodes = contextDoc.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
     const relevant = [];
 
     for (const node of candidateNodes) {
@@ -366,18 +360,16 @@
     return relevant.join(' \n ');
   }
 
-  function extractAmazonDirect() {
-    const drawerRows = document.querySelectorAll(
-      '#voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #productOverview_feature_div table tr'
+  function extractAmazonDirect(contextDoc = document) {
+    const rows = contextDoc.querySelectorAll(
+      '#productOverview_feature_div tr, #voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #detailBullets_feature_div li'
     );
-    for (const row of drawerRows) {
-      const text = row.innerText.toLowerCase();
+    for (const row of rows) {
+      const text = (row.innerText || '').toLowerCase();
       if (text.includes('fabric') || text.includes('material')) {
         return row.innerText;
       }
     }
-    const techTable = document.querySelector('#technicalSpecifications_section_1, #detailBullets_feature_div');
-    if (techTable) return techTable.innerText;
     return null;
   }
 
@@ -551,29 +543,23 @@
     let parsed = null;
 
     if (window.location.hostname.includes('amazon.com')) {
-      const amazonText = extractAmazonDirect();
-      if (amazonText) {
-        parsed = parseComposition(amazonText);
-        if (parsed) console.log('[Fabric Inspector] Found via Amazon direct table:', parsed);
-      }
-    }
-
-    if (!parsed) {
-      const rawText = extractFromJsonLd();
-      parsed = parseComposition(rawText);
-      if (parsed) console.log('[Fabric Inspector] Found via JSON-LD:', parsed);
+      const amazonText = extractAmazonDirect(context);
+      if (amazonText) parsed = parseComposition(amazonText);
     }
 
     if (!parsed) {
       const rawText = extractFromAdapter(context);
       parsed = parseComposition(rawText);
-      if (parsed) console.log('[Fabric Inspector] Found via Site Adapter:', parsed);
+    }
+
+    if (!parsed) {
+      const rawText = extractFromJsonLd(context);
+      parsed = parseComposition(rawText);
     }
 
     if (!parsed) {
       const rawText = extractFromGenericDOM(context);
       parsed = parseComposition(rawText);
-      if (parsed) console.log('[Fabric Inspector] Found via Generic DOM:', parsed);
     }
 
     if (parsed) {
@@ -581,7 +567,7 @@
     }
   }
 
-  // --- UNIVERSAL BACKGROUND HOVER FETCHING ---
+  // --- UNIVERSAL HOVER FETCH (Catalog & Search Grids) ---
 
   const productUrlCache = new Map();
 
@@ -612,11 +598,13 @@
     const anchor = el.closest('a[href]') || el.querySelector('a[href]');
     if (anchor && anchor.href) {
       const href = anchor.href;
+      // Skip irrelevant navigation/account links
       if (
         !href.includes('#') && 
         !href.includes('/cart') && 
         !href.includes('/checkout') && 
         !href.includes('/account') &&
+        !href.includes('/signin') &&
         href !== window.location.href
       ) {
         return href;
@@ -633,7 +621,7 @@
     }
 
     try {
-      console.log('[Fabric Inspector] Background fetching product URL:', url);
+      console.log('[Fabric Inspector] Fetching hovered product:', url);
       const res = await fetch(url, {
         method: 'GET',
         credentials: 'include',
@@ -649,29 +637,37 @@
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlText, 'text/html');
 
-      let rawText = '';
-      const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
-      for (const s of scripts) {
-        rawText += s.textContent + ' \n ';
+      let parsed = null;
+      if (url.includes('amazon.com')) {
+        const amazonText = extractAmazonDirect(doc);
+        if (amazonText) parsed = parseComposition(amazonText);
       }
 
-      rawText += ' \n ' + extractFromAdapter(doc);
-
-      if (!rawText.trim()) {
-        rawText = extractFromGenericDOM(doc);
+      if (!parsed) {
+        const rawText = extractFromAdapter(doc);
+        parsed = parseComposition(rawText);
       }
 
-      const parsed = parseComposition(rawText);
+      if (!parsed) {
+        const rawText = extractFromJsonLd(doc);
+        parsed = parseComposition(rawText);
+      }
+
+      if (!parsed) {
+        const rawText = extractFromGenericDOM(doc);
+        parsed = parseComposition(rawText);
+      }
+
       productUrlCache.set(url, parsed);
       if (parsed) {
         renderBadge(parsed);
       }
     } catch (err) {
-      console.debug('[Fabric Inspector] Fetch error:', err);
+      console.debug('[Fabric Inspector] Background fetch error:', err);
     }
   }
 
-  // --- HOVER / INTERACTION LISTENER ---
+  // --- MOUSEOVER / HOVER LISTENER ---
 
   let hoverTimer = null;
   document.addEventListener('mouseover', (e) => {
@@ -682,14 +678,14 @@
       const target = e.target;
       if (!target) return;
 
-      // 1. Swatches on detail pages
+      // 1. Detail Page Swatches
       const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
       if (swatch) {
         inspectPage(document);
         return;
       }
 
-      // 2. Product tiles on catalog/search grids (Works on Amazon, Zara, ASOS, etc.)[cite: 24, 28]
+      // 2. Product items in grids or catalog lists
       const productCard = target.closest(
         'article, .product-card, [data-component-type="s-search-result"], .c-pwa-tile-grid__item, div[class*="product-grid"], li[class*="product"]'
       ) || target.closest('a');
@@ -709,19 +705,19 @@
   let debounceTimeout = null;
 
   const observer = new MutationObserver(() => {
+    // When URL changes, re-inspect the active page
     if (location.href !== lastHref) {
       lastHref = location.href;
       clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(() => inspectPage(document), 600);
+      debounceTimeout = setTimeout(() => inspectPage(document), 500);
       return;
     }
 
+    // When the DOM updates (e.g. clicking different product color or sizing tabs)
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
-      if (!document.getElementById('fabric-detector-root')) {
-        inspectPage(document);
-      }
-    }, 1500);
+      inspectPage(document);
+    }, 1200);
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
