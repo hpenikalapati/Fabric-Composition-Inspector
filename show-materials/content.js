@@ -227,13 +227,12 @@
     }
   };
 
-  // --- COMPOSITION PARSER ENGINE ---
+  // --- STATE-MACHINE COMPOSITION PARSER ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
 
     const fiberPattern = FIBER_LIST.join('|');
-    // Split by newlines, semicolons, bullets, and slashes (handles "BODY: ... / LINING: ...")
     const lines = rawText.split(/\r?\n|;|\u2022|·|\/|<br\s*\/?>/).map(l => l.trim()).filter(Boolean);
     const sections = [];
 
@@ -243,7 +242,6 @@
       const cleanLine = line.toLowerCase().replace(/[:\-]/g, '').trim();
       const isSleeveDescription = /long sleeve|short sleeve|sleeveless|cuff sleeve/i.test(line);
 
-      // Standalone section headers (e.g. "OUTER SHELL", "LINING")
       const matchedHeader = SECTION_HEADERS.find(h => cleanLine === h || cleanLine.startsWith(h + ' '));
       const hasPercentages = /\d{1,3}%/.test(line);
 
@@ -252,7 +250,6 @@
         continue;
       }
 
-      // Inline section prefix (e.g. "Body: 60% Cotton")
       if (!isSleeveDescription) {
         const inlinePrefix = line.match(new RegExp(`^\\s*(${SECTION_HEADERS.join('|')})\\s*[:\\-]`, 'i'));
         if (inlinePrefix) {
@@ -325,8 +322,8 @@
     return texts.join(' \n ');
   }
 
-  function extractFromAdapter(contextDoc = document) {
-    const host = window.location.hostname.replace(/^www\./, '');
+  function extractFromAdapter(contextDoc = document, targetHost = window.location.hostname) {
+    const host = targetHost.replace(/^www\./, '');
     const sortedKeys = Object.keys(SITE_ADAPTERS).sort((a, b) => b.length - a.length);
     const adapterKey = sortedKeys.find(domain => host.endsWith(domain));
 
@@ -378,9 +375,9 @@
     return null;
   }
 
-  // --- SHADOW DOM UI RENDERER ---
+  // --- SHADOW DOM UI CONTAINER ---
 
-  function renderBadge(sections) {
+  function getOrCreateShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
     if (!host) {
       host = document.createElement('div');
@@ -389,104 +386,181 @@
     }
 
     const shadow = host.shadowRoot || host.attachShadow({ mode: 'open' });
-    shadow.innerHTML = '';
 
-    const style = document.createElement('style');
-    style.textContent = `
-      :host {
-        all: initial;
-      }
-      .fabric-card {
-        position: fixed !important;
-        bottom: 24px !important;
-        right: 24px !important;
-        z-index: 2147483647 !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background: #ffffff;
-        color: #569481;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        width: 280px;
-        overflow: hidden;
-        border: 1px solid #e5e7eb;
-        transition: all 0.2s ease;
-        box-sizing: border-box;
-      }
-      .fabric-card *, .fabric-card *::before, .fabric-card *::after {
-        box-sizing: border-box;
-      }
-      .card-header {
-        background: #000000;
-        color: #ffffff;
-        padding: 10px 14px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-      }
-      .close-btn {
-        background: none;
-        border: none;
-        color: #569481;
-        font-size: 18px;
-        cursor: pointer;
-        line-height: 1;
-        padding: 0;
-        transition: color 0.15s ease;
-      }
-      .close-btn:hover {
-        color: #ffffff;
-      }
-      .card-body {
-        padding: 12px 14px;
-        max-height: 320px;
-        overflow-y: auto;
-      }
-      .section-group {
-        margin-bottom: 10px;
-      }
-      .section-group:last-child {
-        margin-bottom: 0;
-      }
-      .section-title {
-        font-size: 11px;
-        text-transform: uppercase;
-        font-weight: 700;
-        color: #569481;
-        margin-bottom: 6px;
-        letter-spacing: 0.05em;
-      }
-      .comp-item {
-        margin-bottom: 6px;
-      }
-      .comp-meta {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        font-weight: 500;
-        margin-bottom: 3px;
-        color: #569481;
-      }
-      .fiber-name {
-        text-transform: capitalize;
-      }
-      .bar-track {
-        height: 6px;
-        background: #f1f5f9;
-        border-radius: 3px;
-        overflow: hidden;
-      }
-      .bar-fill {
-        height: 100%;
-        border-radius: 3px;
-      }
-      .fill-natural { background: #1ce8a9; }
-      .fill-synthetic { background: #f7391b; }
-      .fill-delicate { background: #4facf7; }
+    if (!shadow.querySelector('style')) {
+      const style = document.createElement('style');
+      style.textContent = `
+        :host {
+          all: initial;
+        }
+        .fabric-card {
+          position: fixed !important;
+          bottom: 24px !important;
+          right: 24px !important;
+          z-index: 2147483647 !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          background: #ffffff;
+          color: #569481;
+          border-radius: 12px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          width: 280px;
+          overflow: hidden;
+          border: 1px solid #e5e7eb;
+          transition: transform 0.2s ease, opacity 0.2s ease;
+          box-sizing: border-box;
+        }
+        .fabric-card *, .fabric-card *::before, .fabric-card *::after {
+          box-sizing: border-box;
+        }
+        .card-header {
+          background: #000000;
+          color: #ffffff;
+          padding: 10px 14px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+        }
+        .close-btn {
+          background: none;
+          border: none;
+          color: #569481;
+          font-size: 18px;
+          cursor: pointer;
+          line-height: 1;
+          padding: 0;
+          transition: color 0.15s ease;
+        }
+        .close-btn:hover {
+          color: #ffffff;
+        }
+        .card-body {
+          padding: 12px 14px;
+          max-height: 320px;
+          overflow-y: auto;
+        }
+        .section-group {
+          margin-bottom: 10px;
+        }
+        .section-group:last-child {
+          margin-bottom: 0;
+        }
+        .section-title {
+          font-size: 11px;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #569481;
+          margin-bottom: 6px;
+          letter-spacing: 0.05em;
+        }
+        .comp-item {
+          margin-bottom: 6px;
+        }
+        .comp-meta {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          font-weight: 500;
+          margin-bottom: 3px;
+          color: #569481;
+        }
+        .fiber-name {
+          text-transform: capitalize;
+        }
+        .bar-track {
+          height: 6px;
+          background: #f1f5f9;
+          border-radius: 3px;
+          overflow: hidden;
+        }
+        .bar-fill {
+          height: 100%;
+          border-radius: 3px;
+        }
+        .fill-natural { background: #1ce8a9; }
+        .fill-synthetic { background: #f7391b; }
+        .fill-delicate { background: #4facf7; }
+
+        /* Loading Skeleton Animation */
+        .loading-container {
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .loading-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #569481;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid #e5e7eb;
+          border-top-color: #1ce8a9;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .skeleton-bar {
+          height: 8px;
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+          border-radius: 4px;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `;
+      shadow.appendChild(style);
+    }
+
+    return shadow;
+  }
+
+  // --- RENDER FUNCTIONS ---
+
+  function renderLoading(title = 'Inspecting product...') {
+    const shadow = getOrCreateShadowRoot();
+    const existingCard = shadow.querySelector('.fabric-card');
+    if (existingCard) existingCard.remove();
+
+    const card = document.createElement('div');
+    card.className = 'fabric-card';
+    card.innerHTML = `
+      <div class="card-header">
+        <span>Fabric Composition</span>
+        <button class="close-btn" id="close-card">&times;</button>
+      </div>
+      <div class="loading-container">
+        <div class="loading-label">
+          <div class="spinner"></div>
+          <span>${title}</span>
+        </div>
+        <div class="skeleton-bar" style="width: 80%;"></div>
+        <div class="skeleton-bar" style="width: 60%;"></div>
+      </div>
     `;
-    shadow.appendChild(style);
+
+    shadow.appendChild(card);
+    shadow.getElementById('close-card')?.addEventListener('click', () => {
+      document.getElementById('fabric-detector-root')?.remove();
+    });
+  }
+
+  function renderBadge(sections) {
+    const shadow = getOrCreateShadowRoot();
+    const existingCard = shadow.querySelector('.fabric-card');
+    if (existingCard) existingCard.remove();
 
     const card = document.createElement('div');
     card.className = 'fabric-card';
@@ -528,13 +602,9 @@
     `;
 
     shadow.appendChild(card);
-
-    const closeBtn = shadow.getElementById('close-card');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        host.remove();
-      });
-    }
+    shadow.getElementById('close-card')?.addEventListener('click', () => {
+      document.getElementById('fabric-detector-root')?.remove();
+    });
 
     const primaryPct = sections[0]?.composition[0]?.percentage || 0;
     try {
@@ -542,7 +612,7 @@
     } catch (e) {}
   }
 
-  // --- INSPECTION PIPELINE ---
+  // --- INSPECTION PIPELINE FOR ACTIVE PAGE ---
 
   function inspectPage(context = document) {
     let parsed = null;
@@ -572,48 +642,46 @@
     }
   }
 
-  // --- UNIVERSAL URL RESOLUTION & HOVER PIPELINE ---
+  // --- HOVER URL RESOLVER (MATCHES BROWSER STATUS BAR LINK) ---
 
-  function resolveProductUrl(target) {
-    if (!target) return null;
+  function resolveHoveredProductUrl(el) {
+    if (!el) return null;
 
-    // 1. Amazon direct ASIN card
-    const amazonCard = target.closest('[data-asin], [data-csa-c-item-id], div[data-component-type="s-search-result"]');
-    if (amazonCard && amazonCard.dataset.asin && amazonCard.dataset.asin.trim().length === 10) {
-      return `https://www.amazon.com/dp/${amazonCard.dataset.asin.trim()}`;
-    }
+    // Direct anchor link or child of anchor link
+    const anchor = el.closest('a[href]');
+    if (!anchor || !anchor.href) return null;
 
-    // 2. Nearest anchor tag
-    const anchor = target.closest('a[href]');
-    if (anchor && anchor.href) {
-      const url = anchor.href;
+    const url = anchor.href;
 
+    // 1. Amazon: handles direct /dp/ URLs and search redirect links (/slredirect)
+    if (url.includes('amazon.com')) {
       if (url.includes('/slredirect')) {
         const decoded = decodeURIComponent(url);
         const match = decoded.match(/\/dp\/([A-Z0-9]{10})/i);
         if (match) return `https://www.amazon.com/dp/${match[1]}`;
       }
-
       const dpMatch = url.match(/\/dp\/([A-Z0-9]{10})/i);
       if (dpMatch) return `https://www.amazon.com/dp/${dpMatch[1]}`;
+    }
 
-      if (
-        !url.includes('#') &&
-        !url.includes('/cart') &&
-        !url.includes('/checkout') &&
-        !url.includes('/account') &&
-        !url.includes('/signin') &&
-        !url.includes('javascript:') &&
-        url !== window.location.href
-      ) {
-        return url;
-      }
+    // 2. Generic Product Retail links
+    // Ignore internal page anchors, account links, cart, checkout, or identical current URL
+    if (
+      !url.includes('#') &&
+      !url.includes('javascript:') &&
+      !url.includes('/cart') &&
+      !url.includes('/checkout') &&
+      !url.includes('/account') &&
+      !url.includes('/signin') &&
+      url !== window.location.href
+    ) {
+      return url;
     }
 
     return null;
   }
 
-  function inspectHtmlDoc(doc, targetUrl) {
+  function inspectParsedDoc(doc, targetUrl) {
     let parsed = null;
 
     if (targetUrl.includes('amazon.com')) {
@@ -624,23 +692,8 @@
     if (!parsed) {
       try {
         const parsedUrl = new URL(targetUrl);
-        const host = parsedUrl.hostname.replace(/^www\./, '');
-        const sortedKeys = Object.keys(SITE_ADAPTERS).sort((a, b) => b.length - a.length);
-        const adapterKey = sortedKeys.find(domain => host.endsWith(domain));
-
-        if (adapterKey) {
-          const adapter = SITE_ADAPTERS[adapterKey];
-          const matches = [];
-          for (const sel of adapter.selectors) {
-            const els = doc.querySelectorAll(sel);
-            for (const el of els) {
-              if (el && el.innerText) matches.push(el.innerText);
-            }
-          }
-          if (matches.length > 0) {
-            parsed = parseComposition(matches.join(' \n '));
-          }
-        }
+        const rawText = extractFromAdapter(doc, parsedUrl.hostname);
+        parsed = parseComposition(rawText);
       } catch (e) {}
     }
 
@@ -658,72 +711,79 @@
   }
 
   const hoverCache = new Map();
-  let activeHoverUrl = null;
+  let currentHoverUrl = null;
 
-  function handleProductHover(url) {
-    if (!url || url === activeHoverUrl) return;
-    activeHoverUrl = url;
+  function executeHoverFetch(url) {
+    if (!url || url === currentHoverUrl) return;
+    currentHoverUrl = url;
 
+    // Check memory cache for instant render
     if (hoverCache.has(url)) {
       const cached = hoverCache.get(url);
       if (cached) renderBadge(cached);
       return;
     }
 
+    // Display loading state with spinner
+    renderLoading('Analyzing composition...');
+
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
+      // Discard response if user has already moved cursor to a different link
+      if (currentHoverUrl !== url) return;
+
       if (chrome.runtime.lastError || !res || !res.success) {
+        console.warn('[Fabric Inspector] Hover request error:', chrome.runtime.lastError?.message || res?.error);
         return;
       }
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(res.html, 'text/html');
-      const parsed = inspectHtmlDoc(doc, url);
+      const parsed = inspectParsedDoc(doc, url);
 
       hoverCache.set(url, parsed);
+
       if (parsed) {
         renderBadge(parsed);
+      } else {
+        // Fallback info if the hovered product has no materials listed
+        renderLoading('No material breakdown found');
+        setTimeout(() => {
+          if (currentHoverUrl === url) {
+            document.getElementById('fabric-detector-root')?.remove();
+          }
+        }, 1800);
       }
     });
   }
 
-  let hoverDebounce = null;
+  // --- MOUSEOVER HOVER LISTENER ---
+
+  let hoverTimer = null;
   document.addEventListener('mouseover', (e) => {
+    // Ignore hovering over the inspector's own badge
     if (e.target && e.target.closest('#fabric-detector-root')) return;
 
-    clearTimeout(hoverDebounce);
-    hoverDebounce = setTimeout(() => {
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
       const target = e.target;
       if (!target) return;
 
-      // Swatches on active detail pages
+      // 1. Swatches on the active product page
       const swatch = target.closest('button, a, label, li, div[class*="swatch"], [data-testid*="swatch"]');
       if (swatch) {
         inspectPage(document);
         return;
       }
 
-      // Catalog grid products
-      const productTile = target.closest(
-        '[data-asin], [data-component-type="s-search-result"], article, .product-card, div[class*="product-grid"], li[class*="product"], .c-pwa-tile-grid__item'
-      ) || target.closest('a');
-
-      if (productTile) {
-        const cardText = productTile.innerText || '';
-        const onCardParsed = parseComposition(cardText);
-        if (onCardParsed) {
-          renderBadge(onCardParsed);
-          return;
-        }
-
-        const url = resolveProductUrl(productTile);
-        if (url) {
-          handleProductHover(url);
-        }
+      // 2. Product title / image links that resolve to a product URL (as seen in browser status bar)
+      const targetUrl = resolveHoveredProductUrl(target);
+      if (targetUrl) {
+        executeHoverFetch(targetUrl);
       }
-    }, 120);
+    }, 150); // 150ms hover trigger provides immediate response
   });
 
-  // --- SPA ROUTE & DOM OBSERVER ---
+  // --- ROUTE & HYDRATION OBSERVER ---
 
   let lastHref = location.href;
   let debounceTimeout = null;
@@ -731,6 +791,7 @@
   const observer = new MutationObserver(() => {
     if (location.href !== lastHref) {
       lastHref = location.href;
+      currentHoverUrl = null;
       clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(() => inspectPage(document), 500);
       return;
@@ -738,13 +799,16 @@
 
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
-      inspectPage(document);
+      // Only re-inspect page if not actively displaying a hover result
+      if (!currentHoverUrl) {
+        inspectPage(document);
+      }
     }, 1200);
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Initial runs
+  // Initial runs for the active page
   inspectPage(document);
   setTimeout(() => inspectPage(document), 1000);
   setTimeout(() => inspectPage(document), 2500);
