@@ -110,7 +110,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     fetch(url, {
       method: 'GET',
-      credentials: storeKey === 'AMAZON' ? 'omit' : 'include',
+      credentials: storeKey === 'include',
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
@@ -120,6 +120,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return res.text();
       })
       .then(html => {
+        if (html.includes('api-services-support@amazon.com') || html.includes('validateCaptcha')) {
+          sendResponse({ success: false, error: 'Amazon CAPTCHA block' });
+          return;
+        }
         cache.set(cacheKey, html);
         sendResponse({ success: true, html });
       })
