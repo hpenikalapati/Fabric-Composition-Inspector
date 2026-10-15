@@ -6,7 +6,6 @@
 
   console.log('[Fabric Inspector] Injected on:', window.location.hostname);
 
-  // Fiber Classification
   const NATURAL_FIBERS = [
     'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 
     'linen', 'flax', 'hemp', 'jute', 'alpaca', 'mohair', 'down', 'feather', 'leather', 'suede'
@@ -178,7 +177,7 @@
     }
   };
 
-  // --- STATE-MACHINE COMPOSITION PARSER ---
+  // --- PARSER ENGINE ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -247,7 +246,7 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION PIPELINE ---
+  // --- EXTRACTION LAYERS ---
 
   function extractFromJsonLd(contextDoc) {
     if (!contextDoc) return '';
@@ -346,15 +345,15 @@
     return parsed;
   }
 
-  // --- RELIABLE UI CONTAINER (ATTACHED DIRECTLY TO BODY) ---
+  // --- MOUNT SHADOW DOM CONTAINER ---
 
   function getShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
     if (!host) {
       host = document.createElement('div');
       host.id = 'fabric-detector-root';
-      host.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 2147483647; pointer-events: auto;';
-      document.body.appendChild(host);
+      host.style.cssText = 'position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 2147483647 !important; pointer-events: auto !important; display: block !important;';
+      (document.body || document.documentElement).appendChild(host);
     }
 
     let shadow = host.shadowRoot;
@@ -371,7 +370,7 @@
           background: #ffffff;
           color: #569481;
           border-radius: 12px;
-          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.22);
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
           width: 290px;
           overflow: hidden;
           border: 1px solid #e5e7eb;
@@ -547,27 +546,57 @@
     } catch (e) {}
   }
 
-  // --- SAME-ORIGIN BACKGROUND PAGE PRE-LOADER ---
+  // --- PATH-TRAVERSING URL RESOLVER ---
 
-  let bgLoaderFrame = null;
+  function getProductUrlFromEvent(e) {
+    const path = e.composedPath ? e.composedPath() : [];
+
+    for (const el of path) {
+      if (!el || !el.getAttribute) continue;
+
+      // 1. Amazon Direct ASIN
+      if (el.hasAttribute('data-asin') && el.getAttribute('data-asin').length === 10) {
+        return `https://www.amazon.com/dp/${el.getAttribute('data-asin')}`;
+      }
+
+      // 2. Product link anchor
+      if (el.tagName === 'A' && el.href) {
+        const href = el.href;
+
+        // Amazon redirect or direct
+        if (href.includes('amazon.com')) {
+          const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
+          if (match) return `https://www.amazon.com/dp/${match[1]}`;
+        }
+
+        // Generic retail link filter
+        const badPatterns = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag'];
+        if (!badPatterns.some(p => href.toLowerCase().includes(p))) {
+          // If the link has an ID or points to an HTML product detail page
+          if (href.includes('.html') || href.includes('/p/') || href.includes('/product/') || href.includes('/dp/')) {
+            return href;
+          }
+          // Accept any clean product link
+          if (href.split('?')[0] !== window.location.href.split('?')[0]) {
+            return href;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // --- HOVER DISPATCHER ---
+
   const hoverCache = new Map();
   let activeHoverUrl = null;
 
-  function getOrCreateBackgroundFrame() {
-    if (!bgLoaderFrame) {
-      bgLoaderFrame = document.createElement('iframe');
-      bgLoaderFrame.id = 'fabric-inspector-bg-loader';
-      bgLoaderFrame.style.cssText = 'position: absolute !important; width: 1px !important; height: 1px !important; top: -9999px !important; left: -9999px !important; opacity: 0 !important; pointer-events: none !important; border: 0 !important;';
-      document.body.appendChild(bgLoaderFrame);
-    }
-    return bgLoaderFrame;
-  }
-
-  function loadUrlInBackground(url) {
+  function handleHover(url) {
     if (!url || url === activeHoverUrl) return;
     activeHoverUrl = url;
 
-    console.log('[Fabric Inspector] Pre-loading URL in background:', url);
+    console.log('[Fabric Inspector] Target Hover URL:', url);
 
     if (hoverCache.has(url)) {
       const cached = hoverCache.get(url);
@@ -577,121 +606,58 @@
 
     renderLoading('Analyzing composition...');
 
-    // Try fast fetch via background service worker first (instant on Amazon/SSR)
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
       if (activeHoverUrl !== url) return;
 
-      if (res && res.success && res.html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(res.html, 'text/html');
-        const parsed = inspectDocument(doc, url);
-
-        if (parsed) {
-          hoverCache.set(url, parsed);
-          renderBadge(parsed);
-          return;
-        }
+      if (!res || !res.success || !res.html) {
+        console.warn('[Fabric Inspector] Background fetch failed for:', url, res?.error);
+        renderLoading('No material breakdown found');
+        return;
       }
 
-      // If raw HTML fetch had no material data (SPA sites like Zara, Target, Hollister),
-      // load the URL in our same-origin background iframe so its client-side JavaScript executes
-      const frame = getOrCreateBackgroundFrame();
-      
-      const onFrameLoad = () => {
-        frame.removeEventListener('load', onFrameLoad);
-        if (activeHoverUrl !== url) return;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(res.html, 'text/html');
+      const parsed = inspectDocument(doc, url);
 
-        // Allow 350ms for client hydration (React/Vue/MFE components)
+      hoverCache.set(url, parsed);
+
+      if (parsed) {
+        renderBadge(parsed);
+      } else {
+        renderLoading('No material breakdown found');
         setTimeout(() => {
-          try {
-            const frameDoc = frame.contentDocument || frame.contentWindow?.document;
-            const spaParsed = inspectDocument(frameDoc, url);
-
-            hoverCache.set(url, spaParsed);
-
-            if (spaParsed) {
-              renderBadge(spaParsed);
-            } else {
-              renderLoading('No material breakdown found');
-              setTimeout(() => {
-                if (activeHoverUrl === url) {
-                  getShadowRoot().querySelector('.fabric-card')?.remove();
-                }
-              }, 1800);
-            }
-          } catch (e) {
-            console.warn('[Fabric Inspector] Same-origin read error:', e);
+          if (activeHoverUrl === url) {
+            getShadowRoot().querySelector('.fabric-card')?.remove();
           }
-        }, 350);
-      };
-
-      frame.addEventListener('load', onFrameLoad);
-      frame.src = url;
+        }, 1800);
+      }
     });
   }
 
-  // --- CANONICAL URL RESOLVER ---
-
-  function resolveLinkToProductUrl(el) {
-    if (!el) return null;
-
-    // Amazon: Check tile ASIN
-    const amazonTile = el.closest('[data-asin]');
-    if (amazonTile && amazonTile.dataset.asin && amazonTile.dataset.asin.length === 10) {
-      return `https://www.amazon.com/dp/${amazonTile.dataset.asin}`;
-    }
-
-    // Nearest anchor
-    const anchor = el.closest('a[href]');
-    if (!anchor || !anchor.href) return null;
-
-    const href = anchor.href;
-
-    if (href.includes('amazon.com')) {
-      const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-      if (match) return `https://www.amazon.com/dp/${match[1]}`;
-    }
-
-    const ignored = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help'];
-    if (ignored.some(pattern => href.toLowerCase().includes(pattern))) return null;
-
-    // Ignore current page
-    const cleanCurrent = window.location.href.split('?')[0].split('#')[0];
-    const cleanTarget = href.split('?')[0].split('#')[0];
-    if (cleanTarget === cleanCurrent) return null;
-
-    return href;
-  }
-
-  // --- HOVER LISTENER ---
-
-  let moveThrottle = null;
-
+  // Mousemove listener with composedPath evaluation
+  let throttle = null;
   window.addEventListener('mousemove', (e) => {
-    if (moveThrottle) return;
-    moveThrottle = setTimeout(() => { moveThrottle = null; }, 50);
+    if (throttle) return;
+    throttle = setTimeout(() => { throttle = null; }, 50);
 
-    const target = e.target;
-    if (!target) return;
+    const path = e.composedPath ? e.composedPath() : [];
+    if (path.some(el => el.id === 'fabric-detector-root')) return;
 
-    if (target.id === 'fabric-detector-root' || target.closest('#fabric-detector-root')) return;
-
-    // Swatches on active page
-    const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
+    // Check swatches on detail page
+    const swatch = path.find(el => el.matches && el.matches('button, a, label, li, div[class*="swatch"]'));
     if (swatch) {
       const parsed = inspectDocument(document, window.location.href);
       if (parsed) renderBadge(parsed);
       return;
     }
 
-    // Product Title Links or Product Cards
-    const url = resolveLinkToProductUrl(target);
+    const url = getProductUrlFromEvent(e);
     if (url) {
-      loadUrlInBackground(url);
+      handleHover(url);
     }
   }, { passive: true });
 
-  // Inspect detail page on load
+  // Initial runs for product detail pages
   const initialData = inspectDocument(document, window.location.href);
   if (initialData) renderBadge(initialData);
 
