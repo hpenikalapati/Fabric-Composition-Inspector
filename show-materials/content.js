@@ -4,8 +4,11 @@
   if (window.__fabric_detector_injected) return;
   window.__fabric_detector_injected = true;
 
-  console.log('[Fabric Inspector] Active on:', window.location.hostname);
+  const currentHost = window.location.hostname;
+  const isAmazon = currentHost.includes('amazon.com');
+  console.log('[Fabric Inspector] Initialized on:', currentHost, '| Mode:', isAmazon ? 'Amazon (Hover + PDP)' : 'Retailer (PDP Only)');
 
+  // Fiber Classification
   const NATURAL_FIBERS = [
     'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 
     'linen', 'flax', 'hemp', 'jute', 'alpaca', 'mohair', 'down', 'feather', 'leather', 'suede'
@@ -26,8 +29,8 @@
   const SECTION_HEADERS = [
     'outer shell', 'shell', 'upper', 'body and lining', 'lining', 'body', 
     'sleeves', 'sleeve', 'filling', 'fill', 'padding', 'trim', 
-    'pocketing', 'pockets', 'pocket', 'pocket bag', 'rib', 'cuff', 'collar', 'hood', 'main',
-    'piece 1', 'piece 2', 'piece 3'
+    'pocketing', 'pockets', 'pocket', 'pocket bag', 'rib', 'cuff', 'collar', 
+    'hood', 'main', 'piece 1', 'piece 2', 'piece 3'
   ];
 
   const SITE_ADAPTERS = {
@@ -52,7 +55,11 @@
         'div[data-testid="equity-group"] ul[class*="list"] li',
         'div[data-testid="equity-group"]',
         '.accordion-body-visible'
-      ]
+      ],
+      preAction: () => {
+        const btn = document.querySelector('button[data-test-panel-link][aria-expanded="false"]');
+        if (btn) btn.click();
+      }
     },
     'aeropostale.com': {
       selectors: [
@@ -66,21 +73,36 @@
         '#collapsible-details-1 ul li',
         '#collapsible-details-1',
         '#product_detail_accordion_content-1'
-      ]
+      ],
+      preAction: () => {
+        const header = document.querySelector('#product_detail_accordion .accordion-header, h2[class*="accordion-header"]');
+        const content = document.querySelector('#product_detail_accordion_content-1');
+        if (header && content && !content.classList.contains('show')) {
+          header.click();
+        }
+      }
     },
     'target.com': {
       selectors: [
         'div[data-test="item-details-specifications"] div:has(> b)',
         'div[data-test="item-details-specifications"]',
         '#specAndDescript'
-      ]
+      ],
+      preAction: () => {
+        const specButton = document.querySelector('button[id*="specifications-accordion"][aria-expanded="false"]');
+        if (specButton) specButton.click();
+      }
     },
     'walmart.com': {
       selectors: [
         'div[data-testid="ui-collapse-panel"] div.nt1 span',
         'div[data-testid="specifications"]',
         'section#specifications-wrapper'
-      ]
+      ],
+      preAction: () => {
+        const expandBtn = document.querySelector('button[data-testid="ui-collapse-panel-header"][aria-expanded="false"], section#specifications-wrapper button');
+        if (expandBtn) expandBtn.click();
+      }
     },
     'oldnavy.gap.com': {
       selectors: [
@@ -101,7 +123,11 @@
         'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
         'div[class*="fds_panel_details-content"]',
         '#pdp-product-info-container'
-      ]
+      ],
+      preAction: () => {
+        const panel = document.querySelector('.productInformationItem button[aria-expanded="false"]');
+        if (panel) panel.click();
+      }
     },
     'nordstrom.com': {
       selectors: [
@@ -122,28 +148,47 @@
         'span.description-content__val-content',
         'div[class*="description-content__list-text-val"]',
         'div.description-content'
-      ]
+      ],
+      preAction: () => {
+        const viewMoreBtn = document.querySelector('button.new-goods-attr__view-more');
+        if (viewMoreBtn) viewMoreBtn.click();
+      }
     },
     'asos.com': {
       selectors: [
         '#productDescriptionDetails div[class*="F_yff"]',
         'div[data-testid="productDescriptionDetails"]',
         '#productDescriptionDetails'
-      ]
+      ],
+      preAction: () => {
+        const btn = document.querySelector('#productDescriptionDetails h2[data-testid="heading"]');
+        const wrapper = document.querySelector('#productDescriptionDetails');
+        if (btn && wrapper && wrapper.style.visibility === 'hidden') {
+          btn.click();
+        }
+      }
     },
     'jcrew.com': {
       selectors: [
         'ul[class*="ProductDetails_tech-list"] li[class*="ProductDetails_tech-item"]',
         'ul[class*="ProductDetails_tech-list"]',
         'div[class*="ProductDetails_product-details-content"]'
-      ]
+      ],
+      preAction: () => {
+        const accordionBtn = document.querySelector('button[aria-controls="accordion-panel--r2"][aria-expanded="false"]');
+        if (accordionBtn) accordionBtn.click();
+      }
     },
     'uniqlo.com': {
       selectors: [
         '#productMaterialDescription-content p[data-testid="ITOTypography"]',
         'div[id="productMaterialDescription-content"]',
         'div[data-testid="ITOTypography"]'
-      ]
+      ],
+      preAction: () => {
+        const accordionBtn = document.querySelector('button[aria-controls*="productMaterialDescription"][aria-expanded="false"]');
+        if (accordionBtn) accordionBtn.click();
+      }
     },
     'hm.com': {
       selectors: [
@@ -152,21 +197,36 @@
         'div#sectionMaterialsAndCareAccordion',
         'dl[class*="materials"] dd',
         'section[class*="MaterialsAndCare"]'
-      ]
+      ],
+      preAction: () => {
+        const toggle = document.querySelector('#toggle-materialsAndCareAccordion[aria-expanded="false"], button[aria-controls*="materialsAndCare"]');
+        if (toggle) toggle.click();
+      }
     },
     'urbanoutfitters.com': {
       selectors: [
         'div.s-pwa-cms.c-pwa-markdown p',
         'div[class*="c-pwa-product-details__details"] p',
         'div[class*="c-pwa-product-details__details"]'
-      ]
+      ],
+      preAction: () => {
+        const accordion = document.querySelector('div[class*="c-pwa-product-details__details"] h2');
+        const panel = document.querySelector('.o-pwa-accordion__panel');
+        if (accordion && panel && (panel.style.display === 'none' || panel.hidden)) {
+          accordion.click();
+        }
+      }
     },
     'hollisterco.com': {
       selectors: [
         'h4.fabric-care-mfe__label',
         'div[data-testid="fabric-care-mfe"]',
         '#details-accordion-panel-id'
-      ]
+      ],
+      preAction: () => {
+        const btn = document.querySelector('div[data-testid="accordion-header"][aria-expanded="false"]');
+        if (btn) btn.click();
+      }
     },
     'abercrombie.com': {
       selectors: [
@@ -177,7 +237,7 @@
     }
   };
 
-  // --- PARSER ENGINE ---
+  // --- STATE-MACHINE COMPOSITION PARSER ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -246,10 +306,9 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION LAYERS ---
+  // --- EXTRACTION PIPELINE ---
 
-  function extractFromJsonLd(contextDoc) {
-    if (!contextDoc) return '';
+  function extractFromJsonLd(contextDoc = document) {
     const scripts = contextDoc.querySelectorAll('script[type="application/ld+json"]');
     const texts = [];
     for (const script of scripts) {
@@ -267,16 +326,19 @@
     return texts.join(' \n ');
   }
 
-  function extractFromAdapter(contextDoc, targetHost = window.location.hostname) {
-    if (!contextDoc) return '';
+  function extractFromAdapter(contextDoc = document, targetHost = window.location.hostname) {
     const host = targetHost.replace(/^www\./, '');
     const sortedKeys = Object.keys(SITE_ADAPTERS).sort((a, b) => b.length - a.length);
     const adapterKey = sortedKeys.find(domain => host.endsWith(domain));
 
     if (!adapterKey) return '';
     const adapter = SITE_ADAPTERS[adapterKey];
-    const matches = [];
 
+    if (adapter.preAction && contextDoc === document) {
+      try { adapter.preAction(); } catch (e) {}
+    }
+
+    const matches = [];
     for (const sel of adapter.selectors) {
       const elements = contextDoc.querySelectorAll(sel);
       for (const el of elements) {
@@ -286,8 +348,7 @@
     return matches.join(' \n ');
   }
 
-  function extractFromGenericDOM(contextDoc) {
-    if (!contextDoc) return '';
+  function extractFromGenericDOM(contextDoc = document) {
     const candidateNodes = contextDoc.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
     const relevant = [];
     for (const node of candidateNodes) {
@@ -301,8 +362,7 @@
     return relevant.join(' \n ');
   }
 
-  function extractAmazonDirect(contextDoc) {
-    if (!contextDoc) return null;
+  function extractAmazonDirect(contextDoc = document) {
     const rows = contextDoc.querySelectorAll(
       '#productOverview_feature_div tr, #voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #detailBullets_feature_div li'
     );
@@ -315,7 +375,7 @@
     return null;
   }
 
-  function inspectDocument(doc, targetUrl = window.location.href) {
+  function inspectDocument(doc = document, targetUrl = window.location.href) {
     if (!doc) return null;
     let parsed = null;
 
@@ -345,7 +405,7 @@
     return parsed;
   }
 
-  // --- PINNED BOTTOM-RIGHT SHADOW DOM CONTAINER ---
+  // --- SETTLED BOTTOM-RIGHT SHADOW DOM CONTAINER ---
 
   function getShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
@@ -353,7 +413,7 @@
       host = document.createElement('div');
       host.id = 'fabric-detector-root';
       host.style.cssText = 'position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 2147483647 !important; pointer-events: auto !important; display: block !important;';
-      (document.body || document.documentElement).appendChild(host);
+      document.body.appendChild(host);
     }
 
     let shadow = host.shadowRoot;
@@ -426,9 +486,12 @@
           overflow: hidden;
         }
         .bar-fill { height: 100%; border-radius: 3px; }
+        
+        /* Fiber Tier Color Hierarchy */
         .fill-natural { background: #1ce8a9; }
         .fill-semi-synthetic { background: #F5CF27; }
         .fill-synthetic { background: #f7391b; }
+
         .loading-container {
           padding: 16px 14px;
           display: flex;
@@ -550,127 +613,137 @@
     } catch (e) {}
   }
 
-  // --- CARD & ASIN TARGET RESOLVER (THE ORIGINAL AMAZON LOGIC) ---
+  // --- RUN PRIMARY INSPECTION (PDP ONLY) ---
 
-  function findProductTarget(el) {
-    if (!el || el.id === 'fabric-detector-root' || el.closest('#fabric-detector-root')) return null;
-
-    // 1. Amazon direct ASIN card detection
-    const amazonTile = el.closest('[data-asin], [data-csa-c-item-id]');
-    if (amazonTile) {
-      const asin = (amazonTile.dataset.asin || amazonTile.getAttribute('data-csa-c-item-id') || '').trim();
-      if (/^[A-Z0-9]{10}$/i.test(asin)) {
-        return `https://www.amazon.com/dp/${asin}`;
-      }
+  function runPdpInspection() {
+    const parsed = inspectDocument(document, window.location.href);
+    if (parsed) {
+      renderBadge(parsed);
     }
-
-    // 2. Direct anchor tag
-    const anchor = el.closest('a[href]');
-    if (anchor && anchor.href) {
-      const href = anchor.href;
-
-      if (href.includes('amazon.com')) {
-        const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-        if (match) return `https://www.amazon.com/dp/${match[1]}`;
-      }
-
-      // Check generic product card link
-      const badPatterns = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help'];
-      if (!badPatterns.some(p => href.toLowerCase().includes(p)) && href !== window.location.href) {
-        return href;
-      }
-    }
-
-    // 3. Retail product card container (Aéropostale, Hollister, Target, etc.)
-    const cardContainer = el.closest('article, [class*="product-tile"], [class*="product-card"], [class*="grid-product"], [class*="ProductCard"], li[class*="product"]');
-    if (cardContainer) {
-      const cardAnchor = cardContainer.querySelector('a[href]');
-      if (cardAnchor && cardAnchor.href && cardAnchor.href !== window.location.href) {
-        return cardAnchor.href;
-      }
-    }
-
-    return null;
   }
 
-  // --- HOVER DISPATCHER ---
+  // --- PART 1: AMAZON HOVER ENGINE ---
 
-  const hoverCache = new Map();
-  let currentHoverUrl = null;
+  if (isAmazon) {
+    const amazonCache = new Map();
+    let currentAsin = null;
+    let hoverTimer = null;
 
-  function triggerHover(url) {
-    if (!url || url === currentHoverUrl) return;
-    currentHoverUrl = url;
+    function handleAmazonHover(asin) {
+      if (!asin || asin === currentAsin) return;
+      currentAsin = asin;
 
-    console.log('[Fabric Inspector] Hovering product:', url);
+      console.log('[Fabric Inspector] Amazon ASIN Hovered:', asin);
 
-    if (hoverCache.has(url)) {
-      const cached = hoverCache.get(url);
-      if (cached) renderBadge(cached);
-      return;
-    }
-
-    renderLoading('Analyzing composition...');
-
-    chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
-      if (currentHoverUrl !== url) return;
-
-      if (!res || !res.success || !res.html) {
-        console.warn('[Fabric Inspector] Fetch failed for:', url);
-        renderLoading('No material breakdown found');
-        setTimeout(() => {
-          if (currentHoverUrl === url) {
-            document.getElementById('fabric-detector-root')?.remove();
-          }
-        }, 1500);
+      if (amazonCache.has(asin)) {
+        const cached = amazonCache.get(asin);
+        if (cached) renderBadge(cached);
         return;
       }
 
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(res.html, 'text/html');
-      const parsed = inspectDocument(doc, url);
+      renderLoading('Analyzing Amazon product...');
 
-      hoverCache.set(url, parsed);
+      chrome.runtime.sendMessage({ type: 'FETCH_AMAZON_HOVER', asin }, (res) => {
+        if (currentAsin !== asin) return;
 
-      if (parsed) {
-        renderBadge(parsed);
-      } else {
-        renderLoading('No material breakdown found');
-        setTimeout(() => {
-          if (currentHoverUrl === url) {
-            document.getElementById('fabric-detector-root')?.remove();
+        if (!res || !res.success || !res.html) {
+          renderLoading('No material breakdown found');
+          setTimeout(() => {
+            if (currentAsin === asin) document.getElementById('fabric-detector-root')?.remove();
+          }, 1500);
+          return;
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(res.html, 'text/html');
+        const parsed = inspectDocument(doc, `https://www.amazon.com/dp/${asin}`);
+
+        amazonCache.set(asin, parsed);
+
+        if (parsed) {
+          renderBadge(parsed);
+        } else {
+          renderLoading('No material breakdown found');
+          setTimeout(() => {
+            if (currentAsin === asin) document.getElementById('fabric-detector-root')?.remove();
+          }, 1500);
+        }
+      });
+    }
+
+    // Capture-phase listener strictly for Amazon catalog grids and carousels
+    document.addEventListener('mouseover', (e) => {
+      const path = e.composedPath ? e.composedPath() : [];
+      if (path.some(el => el.id === 'fabric-detector-root')) return;
+
+      // Check for ASIN on cards or links
+      for (const el of path) {
+        if (!el || !el.getAttribute) continue;
+
+        // Card container ASIN
+        const asin = el.getAttribute('data-asin') || el.getAttribute('data-csa-c-item-id');
+        if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
+          clearTimeout(hoverTimer);
+          hoverTimer = setTimeout(() => handleAmazonHover(asin.trim()), 90);
+          return;
+        }
+
+        // Direct anchor link with /dp/
+        if (el.tagName === 'A' && el.href) {
+          const match = el.href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(el.href).match(/\/dp\/([A-Z0-9]{10})/i);
+          if (match) {
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(() => handleAmazonHover(match[1]), 90);
+            return;
           }
-        }, 1500);
+        }
       }
-    });
+    }, { capture: true, passive: true });
+
+    // Amazon PDP check: runs only if viewing an actual product page
+    if (window.location.pathname.includes('/dp/') || window.location.pathname.includes('/gp/product/')) {
+      runPdpInspection();
+      setTimeout(runPdpInspection, 1500);
+    }
   }
 
-  // Direct mouseover listener with debounce
-  let timer = null;
+  // --- PART 2: OTHER RETAILERS (STRICTLY PRODUCT DETAIL PAGES) ---
 
-  document.addEventListener('mouseover', (e) => {
-    const target = e.target;
-    if (!target) return;
+  if (!isAmazon) {
+    // Check if the current page has a purchase / add-to-bag button
+    const isPdpPage = () => {
+      return !!document.querySelector(
+        'button[data-testid*="add-to-bag"], button[class*="add-to-bag"], button[id*="add-to-cart"], button[data-testid*="AddToCart"], [data-testid="pdp-buy-box"]'
+      );
+    };
 
-    // Swatches on active PDP
-    const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
-    if (swatch) {
-      const parsed = inspectDocument(document, window.location.href);
-      if (parsed) renderBadge(parsed);
-      return;
-    }
+    // Swatches on active detail page
+    document.addEventListener('click', (e) => {
+      const swatch = e.target.closest('button, a, label, li, div[class*="swatch"], [data-testid*="swatch"]');
+      if (swatch) {
+        setTimeout(runPdpInspection, 600);
+      }
+    }, { capture: true, passive: true });
 
-    const url = findProductTarget(target);
-    if (url) {
-      clearTimeout(timer);
-      timer = setTimeout(() => triggerHover(url), 90);
-    }
-  }, true);
+    // Run PDP inspection on load (retrying twice for hydration)
+    const checkAndRun = () => {
+      if (isPdpPage()) {
+        runPdpInspection();
+      }
+    };
 
-  // Auto-inspect strictly on product pages (never catalog search grids)
-  const isPdp = !!document.querySelector('button[data-testid*="add-to-bag"], button[class*="add-to-bag"], button[id*="add-to-cart"], input#add-to-cart-button');
-  if (isPdp) {
-    const initialData = inspectDocument(document, window.location.href);
-    if (initialData) renderBadge(initialData);
+    checkAndRun();
+    setTimeout(checkAndRun, 1000);
+    setTimeout(checkAndRun, 2200);
+
+    // Watch SPA navigation (e.g., clicking between products without full page reload)
+    let lastUrl = location.href;
+    new MutationObserver(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        document.getElementById('fabric-detector-root')?.remove();
+        setTimeout(checkAndRun, 800);
+      }
+    }).observe(document.body, { childList: true, subtree: true });
   }
 })();
