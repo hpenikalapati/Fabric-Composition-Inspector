@@ -225,13 +225,14 @@
     }
   };
 
-  // --- STATE-MACHINE COMPOSITION PARSER ---
+  // --- PARSER ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
 
     const fiberPattern = FIBER_LIST.join('|');
-    const lines = rawText.split(/\r?\n|;|\u2022|·|<br\s*\/?>/).map(l => l.trim()).filter(Boolean);
+    // Split by newlines, semicolons, bullets, and slashes (handles "BODY: ... / LINING: ...")
+    const lines = rawText.split(/\r?\n|;|\u2022|·|\/|<br\s*\/?>/).map(l => l.trim()).filter(Boolean);
     const sections = [];
 
     let currentSection = 'General';
@@ -249,7 +250,7 @@
       }
 
       if (!isSleeveDescription) {
-        const inlinePrefix = cleanLine.match(new RegExp(`^(${SECTION_HEADERS.join('|')})\\s*[:\\-]`, 'i'));
+        const inlinePrefix = line.match(new RegExp(`^\\s*(${SECTION_HEADERS.join('|')})\\s*[:\\-]`, 'i'));
         if (inlinePrefix) {
           currentSection = inlinePrefix[1].replace(/\b\w/g, c => c.toUpperCase());
         }
@@ -294,7 +295,7 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION LAYERS ---
+  // --- EXTRACTORS ---
 
   function extractFromJsonLd(contextDoc = document) {
     const scripts = contextDoc.querySelectorAll('script[type="application/ld+json"]');
@@ -373,7 +374,7 @@
     return null;
   }
 
-  // --- SHADOW DOM UI RENDERER ---
+  // --- UI RENDERER ---
 
   function renderBadge(sections) {
     let host = document.getElementById('fabric-detector-root');
@@ -567,9 +568,7 @@
     }
   }
 
-  // --- UNIVERSAL HOVER FETCH (Catalog & Search Grids) ---
-
-  const productUrlCache = new Map();
+  // --- HOVER ASIN / URL EXTRACTION ---
 
   function getAmazonAsin(el) {
     if (!el) return null;
@@ -598,7 +597,6 @@
     const anchor = el.closest('a[href]') || el.querySelector('a[href]');
     if (anchor && anchor.href) {
       const href = anchor.href;
-      // Skip irrelevant navigation/account links
       if (
         !href.includes('#') && 
         !href.includes('/cart') && 
@@ -613,61 +611,48 @@
     return null;
   }
 
-  async function fetchAndParseUrl(url) {
-    if (productUrlCache.has(url)) {
-      const cachedData = productUrlCache.get(url);
-      if (cachedData) renderBadge(cachedData);
-      return;
+  function parseHtmlString(htmlText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, 'text/html');
+
+    let parsed = null;
+    if (window.location.hostname.includes('amazon.com')) {
+      const amazonText = extractAmazonDirect(doc);
+      if (amazonText) parsed = parseComposition(amazonText);
     }
 
-    try {
-      console.log('[Fabric Inspector] Fetching hovered product:', url);
-      const res = await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
+    if (!parsed) {
+      const rawText = extractFromAdapter(doc);
+      parsed = parseComposition(rawText);
+    }
 
-      if (!res.ok) return;
+    if (!parsed) {
+      const rawText = extractFromJsonLd(doc);
+      parsed = parseComposition(rawText);
+    }
 
-      const htmlText = await res.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, 'text/html');
+    if (!parsed) {
+      const rawText = extractFromGenericDOM(doc);
+      parsed = parseComposition(rawText);
+    }
 
-      let parsed = null;
-      if (url.includes('amazon.com')) {
-        const amazonText = extractAmazonDirect(doc);
-        if (amazonText) parsed = parseComposition(amazonText);
+    return parsed;
+  }
+
+  function delegateBackgroundFetch(url) {
+    chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
+      if (chrome.runtime.lastError || !res || !res.success) {
+        console.warn('[Fabric Inspector] Hover request error:', chrome.runtime.lastError?.message || res?.error);
+        return;
       }
-
-      if (!parsed) {
-        const rawText = extractFromAdapter(doc);
-        parsed = parseComposition(rawText);
-      }
-
-      if (!parsed) {
-        const rawText = extractFromJsonLd(doc);
-        parsed = parseComposition(rawText);
-      }
-
-      if (!parsed) {
-        const rawText = extractFromGenericDOM(doc);
-        parsed = parseComposition(rawText);
-      }
-
-      productUrlCache.set(url, parsed);
+      const parsed = parseHtmlString(res.html);
       if (parsed) {
         renderBadge(parsed);
       }
-    } catch (err) {
-      console.debug('[Fabric Inspector] Background fetch error:', err);
-    }
+    });
   }
 
-  // --- MOUSEOVER / HOVER LISTENER ---
+  // --- HOVER LISTENER ---
 
   let hoverTimer = null;
   document.addEventListener('mouseover', (e) => {
@@ -678,34 +663,41 @@
       const target = e.target;
       if (!target) return;
 
-      // 1. Detail Page Swatches
+      // 1. Swatches on detail pages
       const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
       if (swatch) {
         inspectPage(document);
         return;
       }
 
-      // 2. Product items in grids or catalog lists
+      // 2. Product grids or cards
       const productCard = target.closest(
         'article, .product-card, [data-component-type="s-search-result"], .c-pwa-tile-grid__item, div[class*="product-grid"], li[class*="product"]'
       ) || target.closest('a');
 
       if (productCard) {
+        // A. If the card already contains fabric data directly in its visible DOM
+        const onCardParsed = parseComposition(productCard.innerText || '');
+        if (onCardParsed) {
+          renderBadge(onCardParsed);
+          return;
+        }
+
+        // B. Offload network fetch to background.js
         const url = getProductUrl(productCard);
         if (url && url !== window.location.href) {
-          fetchAndParseUrl(url);
+          delegateBackgroundFetch(url);
         }
       }
-    }, 180);
+    }, 150);
   });
 
-  // --- SPA ROUTE & DOM OBSERVER ---
+  // --- DOM OBSERVER ---
 
   let lastHref = location.href;
   let debounceTimeout = null;
 
   const observer = new MutationObserver(() => {
-    // When URL changes, re-inspect the active page
     if (location.href !== lastHref) {
       lastHref = location.href;
       clearTimeout(debounceTimeout);
@@ -713,7 +705,6 @@
       return;
     }
 
-    // When the DOM updates (e.g. clicking different product color or sizing tabs)
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
       inspectPage(document);
@@ -722,7 +713,7 @@
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Initial runs for client-side hydrated views
+  // Initial runs
   inspectPage(document);
   setTimeout(() => inspectPage(document), 1000);
   setTimeout(() => inspectPage(document), 2500);
