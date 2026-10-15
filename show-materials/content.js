@@ -818,10 +818,21 @@
   let currentHoverId = null;
   let hoverTimer = null;
 
+  function safeSendMessage(payload, callback) {
+    if (!chrome.runtime?.id) return;
+    try {
+      chrome.runtime.sendMessage(payload, (res) => {
+        if (chrome.runtime.lastError) return;
+        if (callback) callback(res);
+      });
+    } catch (e) {}
+  }
+
   function dispatchHover(targetInfo) {
     if (!targetInfo || targetInfo.id === currentHoverId) return;
-    currentHoverId = targetInfo.id;
+    if (!chrome.runtime?.id) return;
 
+    currentHoverId = targetInfo.id;
     console.log('[Fabric Inspector] Product Hovered:', targetInfo);
 
     if (memoryCache.has(targetInfo.id)) {
@@ -834,7 +845,7 @@
 
     // Route 1: Target RedSky API
     if (targetInfo.type === 'TARGET') {
-      chrome.runtime.sendMessage({ type: 'FETCH_TARGET_HOVER', tcin: targetInfo.tcin }, (res) => {
+      safeSendMessage({ type: 'FETCH_TARGET_HOVER', tcin: targetInfo.tcin }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
         if (res && res.success && res.specText) {
           const parsed = parseComposition(res.specText);
@@ -851,7 +862,7 @@
 
     // Route 2: Zara Catalog API + HTML Fallback
     if (targetInfo.type === 'ZARA') {
-      chrome.runtime.sendMessage({ type: 'FETCH_ZARA_HOVER', id: targetInfo.id, v1: targetInfo.v1, url: targetInfo.url }, (res) => {
+      safeSendMessage({ type: 'FETCH_ZARA_HOVER', id: targetInfo.id, v1: targetInfo.v1, url: targetInfo.url }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
         let parsed = null;
         if (res && res.success) {
@@ -870,7 +881,7 @@
     }
 
     // Route 3: Universal HTML + Hydration State Fetcher
-    chrome.runtime.sendMessage({
+    safeSendMessage({
       type: 'FETCH_RETAIL_HTML',
       url: targetInfo.url,
       storeKey: targetInfo.type,
