@@ -7,7 +7,6 @@ chrome.runtime.onInstalled.addListener(() => {
 const cache = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Update extension toolbar badge
   if (message.type === 'FABRIC_DETECTED' && sender.tab) {
     const count = message.count || 0;
     chrome.action.setBadgeBackgroundColor({ tabId: sender.tab.id, color: '#10b981' });
@@ -84,7 +83,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       })
       .catch(() => {
-        // Fallback to fetching Zara HTML
         fetch(url, { credentials: 'include' })
           .then(r => r.text())
           .then(html => {
@@ -110,7 +108,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     fetch(url, {
       method: 'GET',
-      credentials: storeKey === 'include',
+      credentials: storeKey === 'AMAZON' ? 'omit' : 'include', // Fixed boolean condition
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
