@@ -21,6 +21,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  // In background.js message listener:
+  if (message.type === 'FETCH_TARGET_HOVER') {
+    const tcin = message.tcin;
+    const apiUrl = `https://redsky.target.com/redsky_aggregations/v1/web/pdp_client_v1?key=9f36aeafbe60771e321a7cc95a78140772ab3e96&tcin=${tcin}&pricing_store_id=3991`;
+  
+    if (cache.has(tcin)) {
+      sendResponse({ success: true, specs: cache.get(tcin) });
+      return false;
+    }
+  
+    fetch(apiUrl, { headers: { 'Accept': 'application/json' } })
+      .then(res => res.json())
+      .then(data => {
+        const bullets = data?.data?.product?.item?.product_description?.bullet_descriptions || [];
+        const specText = bullets.join('\n');
+        cache.set(tcin, specText);
+        sendResponse({ success: true, specs: specText });
+      })
+      .catch(err => {
+        sendResponse({ success: false, error: err.message });
+      });
+  
+    return true;
+  }
   // Amazon-exclusive hover fetcher
   if (message.type === 'FETCH_AMAZON_HOVER') {
     const asin = message.asin;
