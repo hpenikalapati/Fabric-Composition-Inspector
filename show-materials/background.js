@@ -1,7 +1,7 @@
 // background.js
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Fabric Inspector] Service worker installed.');
+  console.log('[Fabric Inspector] Service worker active.');
 });
 
 const cache = new Map();
@@ -27,12 +27,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       method: 'GET',
       credentials: 'omit',
       headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     })
       .then(res => {
-        if (!res.ok) throw new Error(`Status ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
       .then(html => {
@@ -40,7 +39,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.warn('[Fabric Inspector] Fetch failed for:', url, err);
+        console.warn('[Fabric Inspector] Background fetch failed for:', url, err);
         sendResponse({ success: false, error: err.message });
       });
 
