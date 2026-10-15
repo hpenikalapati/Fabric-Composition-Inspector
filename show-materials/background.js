@@ -25,7 +25,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     fetch(url, {
       method: 'GET',
-      credentials: 'omit',
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
@@ -39,7 +38,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.warn('[Fabric Inspector] Fetch failed for:', url, err);
         sendResponse({ success: false, error: err.message });
       });
 
