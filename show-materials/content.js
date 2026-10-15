@@ -177,7 +177,7 @@
     }
   };
 
-  // --- PARSER ENGINE ---
+  // --- STATE-MACHINE COMPOSITION PARSER ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -246,7 +246,7 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION LAYERS ---
+  // --- EXTRACTION PIPELINE ---
 
   function extractFromJsonLd(contextDoc) {
     if (!contextDoc) return '';
@@ -345,7 +345,7 @@
     return parsed;
   }
 
-  // --- FIXED BOTTOM-RIGHT SHADOW DOM CONTAINER ---
+  // --- SETTLED BOTTOM-RIGHT SHADOW DOM CONTAINER ---
 
   function getShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
@@ -550,21 +550,21 @@
     } catch (e) {}
   }
 
-  // --- MULTI-STORE PRODUCT URL RESOLVER VIA EVENT PATH ---
+  // --- MULTI-STORE URL RESOLVER ---
 
-  function getProductUrlFromEvent(e) {
-    const path = e.composedPath ? e.composedPath() : [];
+  function resolveUrlFromPath(path) {
+    if (!Array.isArray(path)) return null;
 
     for (const el of path) {
       if (!el || !el.getAttribute) continue;
 
-      // Amazon Card or Carousel Item (data-asin or data-csa-c-item-id)
+      // 1. Amazon: data-asin or carousel data-csa-c-item-id
       const asin = el.getAttribute('data-asin') || el.getAttribute('data-csa-c-item-id');
       if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
         return `https://www.amazon.com/dp/${asin.trim()}`;
       }
 
-      // Check anchor tag anywhere in clicked/hovered hierarchy
+      // 2. Clickable anchor element
       if (el.tagName === 'A' && el.href) {
         const href = el.href;
 
@@ -574,12 +574,15 @@
           if (match) return `https://www.amazon.com/dp/${match[1]}`;
         }
 
-        // Standard Retail Product Link
-        const isProductUrl = href.includes('/p/') || href.includes('/product/') || href.includes('.html') || href.includes('/dp/');
+        // Generic Retail Product Links (Aéropostale, Hollister, Zara, Target, etc.)
         const badWords = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag'];
+        const isBad = badWords.some(w => href.toLowerCase().includes(w));
 
-        if (isProductUrl && !badWords.some(w => href.toLowerCase().includes(w))) {
-          return href;
+        if (!isBad) {
+          // Check for product path signatures
+          if (href.includes('/p/') || href.includes('/product/') || href.includes('.html') || href.includes('/dp/')) {
+            return href;
+          }
         }
       }
     }
@@ -587,7 +590,7 @@
     return null;
   }
 
-  // --- HOVER DISPATCHER ---
+  // --- HOVER PIPELINE ---
 
   const hoverCache = new Map();
   let currentTargetUrl = null;
@@ -639,15 +642,15 @@
     });
   }
 
-  // --- MOUSEOVER LISTENER (INSTANT EVENT BUBBLING) ---
-
+  // --- CAPTURE-PHASE EVENT INTERCEPTION ---
+  // Uses { capture: true } on window so retailer scripts calling stopPropagation() cannot block us
   let hoverTimer = null;
 
-  document.addEventListener('mouseover', (e) => {
+  function onGlobalPointerEvent(e) {
     const path = e.composedPath ? e.composedPath() : [];
     if (path.some(el => el.id === 'fabric-detector-root')) return;
 
-    // Swatches on active PDP
+    // Check swatches on PDP
     const swatch = path.find(el => el.matches && el.matches('button, a, label, li, div[class*="swatch"]'));
     if (swatch) {
       const parsed = inspectDocument(document, window.location.href);
@@ -655,15 +658,18 @@
       return;
     }
 
-    const url = getProductUrlFromEvent(e);
+    const url = resolveUrlFromPath(path);
     if (url) {
       clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => handleProductHover(url), 100);
+      hoverTimer = setTimeout(() => handleProductHover(url), 90);
     }
-  }, { passive: true });
+  }
 
-  // --- INITIAL EXECUTION (PDP ONLY) ---
-  // Only runs auto-inspection on product detail pages, NEVER on search/category grids
+  // Intercept on the downward capture phase
+  window.addEventListener('mouseover', onGlobalPointerEvent, { capture: true, passive: true });
+  window.addEventListener('pointerover', onGlobalPointerEvent, { capture: true, passive: true });
+
+  // --- DETAIL PAGE ON-LOAD INSPECTION ---
   const currentPath = window.location.pathname;
   const isPdpPage = currentPath.includes('/p/') || currentPath.includes('/dp/') || currentPath.includes('/product/') || currentPath.endsWith('.html');
 
