@@ -1,7 +1,7 @@
 // background.js
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Fabric Inspector] Background service ready.');
+  console.log('[Fabric Inspector] Service worker active.');
 });
 
 const cache = new Map();
@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })
       .then(res => {
-        if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
       .then(html => {
@@ -43,6 +43,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: err.message });
       });
 
-    return true; // Keep message channel open for async response
+    return true; // Keep channel open
   }
 });
