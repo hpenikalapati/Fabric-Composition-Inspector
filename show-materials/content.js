@@ -4,9 +4,8 @@
   if (window.__fabric_detector_injected) return;
   window.__fabric_detector_injected = true;
 
-  console.log('[Fabric Inspector] Injected into:', window.location.hostname);
+  console.log('[Fabric Inspector] Active on:', window.location.hostname);
 
-  // Fiber Classification
   const NATURAL_FIBERS = [
     'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 
     'linen', 'flax', 'hemp', 'jute', 'alpaca', 'mohair', 'down', 'feather', 'leather', 'suede'
@@ -22,7 +21,6 @@
   ];
 
   const FIBER_LIST = [...NATURAL_FIBERS, ...SEMI_SYNTHETIC_FIBERS, ...SYNTHETIC_FIBERS];
-
   const DESCRIPTORS = '(?:recycled|organic|pima|supima|raw)?\\s*';
 
   const SECTION_HEADERS = [
@@ -54,11 +52,7 @@
         'div[data-testid="equity-group"] ul[class*="list"] li',
         'div[data-testid="equity-group"]',
         '.accordion-body-visible'
-      ],
-      preAction: () => {
-        const btn = document.querySelector('button[data-test-panel-link][aria-expanded="false"]');
-        if (btn) btn.click();
-      }
+      ]
     },
     'aeropostale.com': {
       selectors: [
@@ -67,72 +61,18 @@
         '.product-details-container'
       ]
     },
-    'hottopic.com': {
-      selectors: [
-        '#collapsible-details-1 ul li',
-        '#collapsible-details-1',
-        '#product_detail_accordion_content-1'
-      ],
-      preAction: () => {
-        const header = document.querySelector('#product_detail_accordion .accordion-header, h2[class*="accordion-header"]');
-        const content = document.querySelector('#product_detail_accordion_content-1');
-        if (header && content && !content.classList.contains('show')) {
-          header.click();
-        }
-      }
-    },
     'target.com': {
       selectors: [
         'div[data-test="item-details-specifications"] div:has(> b)',
         'div[data-test="item-details-specifications"]',
         '#specAndDescript'
-      ],
-      preAction: () => {
-        const specButton = document.querySelector('button[id*="specifications-accordion"][aria-expanded="false"]');
-        if (specButton) specButton.click();
-      }
+      ]
     },
     'walmart.com': {
       selectors: [
         'div[data-testid="ui-collapse-panel"] div.nt1 span',
         'div[data-testid="specifications"]',
         'section#specifications-wrapper'
-      ],
-      preAction: () => {
-        const expandBtn = document.querySelector('button[data-testid="ui-collapse-panel-header"][aria-expanded="false"], section#specifications-wrapper button');
-        if (expandBtn) expandBtn.click();
-      }
-    },
-    'oldnavy.gap.com': {
-      selectors: [
-        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
-        'div[class*="fds_panel_details-content"]',
-        '#pdp-product-info-container'
-      ]
-    },
-    'bananarepublic.gap.com': {
-      selectors: [
-        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
-        'div[class*="fds_panel_details-content"]',
-        '#pdp-product-info-container'
-      ]
-    },
-    'gap.com': {
-      selectors: [
-        'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
-        'div[class*="fds_panel_details-content"]',
-        '#pdp-product-info-container'
-      ],
-      preAction: () => {
-        const panel = document.querySelector('.productInformationItem button[aria-expanded="false"]');
-        if (panel) panel.click();
-      }
-    },
-    'nordstrom.com': {
-      selectors: [
-        'ul li[class*="dls-ihm"]',
-        'div:has(> h2) ul li',
-        'section[aria-labelledby="pdp-prompts-heading"] + div ul li'
       ]
     },
     'zara.com': {
@@ -142,90 +82,12 @@
         'div[class*="structured-component-text-block-paragraph"]'
       ]
     },
-    'shein.com': {
-      selectors: [
-        'span.description-content__val-content',
-        'div[class*="description-content__list-text-val"]',
-        'div.description-content'
-      ],
-      preAction: () => {
-        const viewMoreBtn = document.querySelector('button.new-goods-attr__view-more');
-        if (viewMoreBtn) viewMoreBtn.click();
-      }
-    },
-    'asos.com': {
-      selectors: [
-        '#productDescriptionDetails div[class*="F_yff"]',
-        'div[data-testid="productDescriptionDetails"]',
-        '#productDescriptionDetails'
-      ],
-      preAction: () => {
-        const btn = document.querySelector('#productDescriptionDetails h2[data-testid="heading"]');
-        const wrapper = document.querySelector('#productDescriptionDetails');
-        if (btn && wrapper && wrapper.style.visibility === 'hidden') {
-          btn.click();
-        }
-      }
-    },
-    'jcrew.com': {
-      selectors: [
-        'ul[class*="ProductDetails_tech-list"] li[class*="ProductDetails_tech-item"]',
-        'ul[class*="ProductDetails_tech-list"]',
-        'div[class*="ProductDetails_product-details-content"]'
-      ],
-      preAction: () => {
-        const accordionBtn = document.querySelector('button[aria-controls="accordion-panel--r2"][aria-expanded="false"]');
-        if (accordionBtn) accordionBtn.click();
-      }
-    },
-    'uniqlo.com': {
-      selectors: [
-        '#productMaterialDescription-content p[data-testid="ITOTypography"]',
-        'div[id="productMaterialDescription-content"]',
-        'div[data-testid="ITOTypography"]'
-      ],
-      preAction: () => {
-        const accordionBtn = document.querySelector('button[aria-controls*="productMaterialDescription"][aria-expanded="false"]');
-        if (accordionBtn) accordionBtn.click();
-      }
-    },
-    'hm.com': {
-      selectors: [
-        'div#sectionMaterialsAndCareAccordion ul li span',
-        'div#sectionMaterialsAndCareAccordion ul li',
-        'div#sectionMaterialsAndCareAccordion',
-        'dl[class*="materials"] dd',
-        'section[class*="MaterialsAndCare"]'
-      ],
-      preAction: () => {
-        const toggle = document.querySelector('#toggle-materialsAndCareAccordion[aria-expanded="false"], button[aria-controls*="materialsAndCare"]');
-        if (toggle) toggle.click();
-      }
-    },
-    'urbanoutfitters.com': {
-      selectors: [
-        'div.s-pwa-cms.c-pwa-markdown p',
-        'div[class*="c-pwa-product-details__details"] p',
-        'div[class*="c-pwa-product-details__details"]'
-      ],
-      preAction: () => {
-        const accordion = document.querySelector('div[class*="c-pwa-product-details__details"] h2');
-        const panel = document.querySelector('.o-pwa-accordion__panel');
-        if (accordion && panel && (panel.style.display === 'none' || panel.hidden)) {
-          accordion.click();
-        }
-      }
-    },
     'hollisterco.com': {
       selectors: [
         'h4.fabric-care-mfe__label',
         'div[data-testid="fabric-care-mfe"]',
         '#details-accordion-panel-id'
-      ],
-      preAction: () => {
-        const btn = document.querySelector('div[data-testid="accordion-header"][aria-expanded="false"]');
-        if (btn) btn.click();
-      }
+      ]
     },
     'abercrombie.com': {
       selectors: [
@@ -236,7 +98,7 @@
     }
   };
 
-  // --- STATE-MACHINE COMPOSITION PARSER ---
+  // --- PARSER ENGINE ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -305,25 +167,19 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION LAYERS ---
+  // --- EXTRACTORS ---
 
   function extractFromJsonLd(contextDoc = document) {
     const scripts = contextDoc.querySelectorAll('script[type="application/ld+json"]');
     const texts = [];
-
     for (const script of scripts) {
       try {
         const json = JSON.parse(script.textContent);
         const nodes = Array.isArray(json) ? json : (json['@graph'] || [json]);
-
         for (const item of nodes) {
           if (item && (item['@type'] === 'Product' || item['@type'] === 'IndividualProduct')) {
-            if (item.material) {
-              texts.push(typeof item.material === 'string' ? item.material : JSON.stringify(item.material));
-            }
-            if (item.description) {
-              texts.push(item.description);
-            }
+            if (item.material) texts.push(typeof item.material === 'string' ? item.material : JSON.stringify(item.material));
+            if (item.description) texts.push(item.description);
           }
         }
       } catch (e) {}
@@ -338,28 +194,20 @@
 
     if (!adapterKey) return '';
     const adapter = SITE_ADAPTERS[adapterKey];
-
-    if (adapter.preAction && contextDoc === document) {
-      try { adapter.preAction(); } catch (e) {}
-    }
-
     const matches = [];
+
     for (const sel of adapter.selectors) {
       const elements = contextDoc.querySelectorAll(sel);
       for (const el of elements) {
-        if (el && el.innerText) {
-          matches.push(el.innerText);
-        }
+        if (el && el.innerText) matches.push(el.innerText);
       }
     }
-
     return matches.join(' \n ');
   }
 
   function extractFromGenericDOM(contextDoc = document) {
     const candidateNodes = contextDoc.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
     const relevant = [];
-
     for (const node of candidateNodes) {
       if (node.children.length <= 1) {
         const text = node.innerText || '';
@@ -384,17 +232,21 @@
     return null;
   }
 
-  // --- SHADOW DOM UI CONTAINER ---
+  // --- UI SHADOW ROOT MOUNTER ---
 
-  function getOrCreateShadowRoot() {
+  function ensureShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
     if (!host) {
       host = document.createElement('div');
       host.id = 'fabric-detector-root';
-      document.body.appendChild(host);
+      // Mount to documentElement so body rewrites or clearouts don't unmount the UI
+      (document.documentElement || document.body).appendChild(host);
     }
 
-    const shadow = host.shadowRoot || host.attachShadow({ mode: 'open' });
+    let shadow = host.shadowRoot;
+    if (!shadow) {
+      shadow = host.attachShadow({ mode: 'open' });
+    }
 
     if (!shadow.querySelector('style')) {
       const style = document.createElement('style');
@@ -408,129 +260,122 @@
           right: 24px !important;
           z-index: 2147483647 !important;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-          background: #ffffff;
-          color: #569481;
-          border-radius: 12px;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-          width: 280px;
-          overflow: hidden;
-          border: 1px solid #e5e7eb;
-          box-sizing: border-box;
-          pointer-events: auto;
+          background: #ffffff !important;
+          color: #569481 !important;
+          border-radius: 12px !important;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+          width: 290px !important;
+          overflow: hidden !important;
+          border: 1px solid #e5e7eb !important;
+          box-sizing: border-box !important;
+          pointer-events: auto !important;
         }
         .fabric-card *, .fabric-card *::before, .fabric-card *::after {
-          box-sizing: border-box;
+          box-sizing: border-box !important;
         }
         .card-header {
-          background: #000000;
-          color: #ffffff;
-          padding: 10px 14px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 13px;
-          font-weight: 600;
-          letter-spacing: 0.02em;
+          background: #000000 !important;
+          color: #ffffff !important;
+          padding: 10px 14px !important;
+          display: flex !important;
+          justify-content: space-between !important;
+          align-items: center !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.02em !important;
         }
         .close-btn {
-          background: none;
-          border: none;
-          color: #569481;
-          font-size: 18px;
-          cursor: pointer;
-          line-height: 1;
-          padding: 0;
-          transition: color 0.15s ease;
+          background: none !important;
+          border: none !important;
+          color: #569481 !important;
+          font-size: 18px !important;
+          cursor: pointer !important;
+          line-height: 1 !important;
+          padding: 0 !important;
         }
         .close-btn:hover {
-          color: #ffffff;
+          color: #ffffff !important;
         }
         .card-body {
-          padding: 12px 14px;
-          max-height: 320px;
-          overflow-y: auto;
+          padding: 12px 14px !important;
+          max-height: 320px !important;
+          overflow-y: auto !important;
         }
         .section-group {
-          margin-bottom: 10px;
+          margin-bottom: 10px !important;
         }
         .section-group:last-child {
-          margin-bottom: 0;
+          margin-bottom: 0 !important;
         }
         .section-title {
-          font-size: 11px;
-          text-transform: uppercase;
-          font-weight: 700;
-          color: #569481;
-          margin-bottom: 6px;
-          letter-spacing: 0.05em;
+          font-size: 11px !important;
+          text-transform: uppercase !important;
+          font-weight: 700 !important;
+          color: #569481 !important;
+          margin-bottom: 6px !important;
+          letter-spacing: 0.05em !important;
         }
         .comp-item {
-          margin-bottom: 6px;
+          margin-bottom: 6px !important;
         }
         .comp-meta {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-          font-weight: 500;
-          margin-bottom: 3px;
-          color: #569481;
+          display: flex !important;
+          justify-content: space-between !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+          margin-bottom: 3px !important;
+          color: #569481 !important;
         }
         .fiber-name {
-          text-transform: capitalize;
+          text-transform: capitalize !important;
         }
         .bar-track {
-          height: 6px;
-          background: #f1f5f9;
-          border-radius: 3px;
-          overflow: hidden;
+          height: 6px !important;
+          background: #f1f5f9 !important;
+          border-radius: 3px !important;
+          overflow: hidden !important;
         }
         .bar-fill {
-          height: 100%;
-          border-radius: 3px;
-          transition: width 0.3s ease;
+          height: 100% !important;
+          border-radius: 3px !important;
+          transition: width 0.3s ease !important;
         }
 
-        /* Fiber Color Hierarchy */
-        .fill-natural { background: #1ce8a9; }
-        .fill-semi-synthetic { background: #F5CF27; }
-        .fill-synthetic { background: #f7391b; }
+        /* Color Hierarchy */
+        .fill-natural { background: #1ce8a9 !important; }
+        .fill-semi-synthetic { background: #F5CF27 !important; }
+        .fill-synthetic { background: #f7391b !important; }
 
         /* Loading Skeleton */
         .loading-container {
-          padding: 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
+          padding: 16px 14px !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 12px !important;
         }
         .loading-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #569481;
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          color: #569481 !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
         }
         .spinner {
-          width: 14px;
-          height: 14px;
-          border: 2px solid #e5e7eb;
-          border-top-color: #1ce8a9;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
+          width: 14px !important;
+          height: 14px !important;
+          border: 2px solid #e5e7eb !important;
+          border-top-color: #1ce8a9 !important;
+          border-radius: 50% !important;
+          animation: spin 0.8s linear infinite !important;
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
         .skeleton-bar {
-          height: 8px;
-          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-          background-size: 200% 100%;
-          animation: shimmer 1.5s infinite;
-          border-radius: 4px;
-        }
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
+          height: 8px !important;
+          background: #e2e8f0 !important;
+          border-radius: 4px !important;
         }
       `;
       shadow.appendChild(style);
@@ -546,10 +391,8 @@
     return 'fill-synthetic';
   }
 
-  // --- RENDER FUNCTIONS ---
-
   function renderLoading(title = 'Analyzing composition...') {
-    const shadow = getOrCreateShadowRoot();
+    const shadow = ensureShadowRoot();
     const existingCard = shadow.querySelector('.fabric-card');
     if (existingCard) existingCard.remove();
 
@@ -571,13 +414,11 @@
     `;
 
     shadow.appendChild(card);
-    shadow.getElementById('close-card')?.addEventListener('click', () => {
-      document.getElementById('fabric-detector-root')?.remove();
-    });
+    shadow.getElementById('close-card')?.addEventListener('click', () => card.remove());
   }
 
   function renderBadge(sections) {
-    const shadow = getOrCreateShadowRoot();
+    const shadow = ensureShadowRoot();
     const existingCard = shadow.querySelector('.fabric-card');
     if (existingCard) existingCard.remove();
 
@@ -620,9 +461,7 @@
     `;
 
     shadow.appendChild(card);
-    shadow.getElementById('close-card')?.addEventListener('click', () => {
-      document.getElementById('fabric-detector-root')?.remove();
-    });
+    shadow.getElementById('close-card')?.addEventListener('click', () => card.remove());
 
     const primaryPct = sections[0]?.composition[0]?.percentage || 0;
     try {
@@ -630,7 +469,7 @@
     } catch (e) {}
   }
 
-  // --- INSPECTION PIPELINE FOR ACTIVE PAGE ---
+  // --- INSPECTION ON CURRENT PRODUCT PAGE ---
 
   function inspectPage(context = document) {
     let parsed = null;
@@ -660,58 +499,51 @@
     }
   }
 
-  // --- PRECISE URL RESOLVER FOR HOVER ---
+  // --- URL RESOLVER FOR HOVER TARGETS ---
 
-  function resolveHoveredProductUrl(el) {
-    if (!el) return null;
+  function findProductUrl(element) {
+    if (!element) return null;
 
-    // Climb ancestors to find the clickable product link
-    let curr = el;
-    let anchor = null;
-    while (curr && curr !== document.body) {
-      if (curr.tagName === 'A' && curr.href) {
-        anchor = curr;
-        break;
-      }
-      curr = curr.parentElement;
+    // 1. Direct Amazon ASIN on search grid tiles
+    const amazonCard = element.closest('[data-asin]');
+    if (amazonCard && amazonCard.dataset.asin && amazonCard.dataset.asin.length === 10) {
+      return `https://www.amazon.com/dp/${amazonCard.dataset.asin}`;
     }
 
-    if (!anchor || !anchor.href) return null;
-    const url = anchor.href;
+    // 2. Walk up to find anchor tag
+    const anchor = element.closest('a[href]');
+    if (!anchor) return null;
 
-    // Amazon handling
-    if (url.includes('amazon.com')) {
-      if (url.includes('/slredirect')) {
-        const decoded = decodeURIComponent(url);
-        const match = decoded.match(/\/dp\/([A-Z0-9]{10})/i);
-        if (match) return `https://www.amazon.com/dp/${match[1]}`;
-      }
-      const dpMatch = url.match(/\/dp\/([A-Z0-9]{10})/i);
-      if (dpMatch) return `https://www.amazon.com/dp/${dpMatch[1]}`;
+    const href = anchor.href;
+
+    // Check Amazon URL
+    if (href.includes('amazon.com')) {
+      const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
+      if (match) return `https://www.amazon.com/dp/${match[1]}`;
     }
 
-    // Generic retail handling (filters out non-product anchors)
-    const ignoredPatterns = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login'];
-    const isIgnored = ignoredPatterns.some(p => url.includes(p));
+    // Check Retail Product URLs
+    const excluded = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login'];
+    if (excluded.some(p => href.includes(p))) return null;
 
-    if (!isIgnored && url !== window.location.href) {
-      return url;
+    if (href.split('?')[0] !== window.location.href.split('?')[0]) {
+      return href;
     }
 
     return null;
   }
 
-  function inspectParsedDoc(doc, targetUrl) {
+  function parseHtmlDoc(doc, url) {
     let parsed = null;
 
-    if (targetUrl.includes('amazon.com')) {
+    if (url.includes('amazon.com')) {
       const amazonText = extractAmazonDirect(doc);
       if (amazonText) parsed = parseComposition(amazonText);
     }
 
     if (!parsed) {
       try {
-        const parsedUrl = new URL(targetUrl);
+        const parsedUrl = new URL(url);
         const rawText = extractFromAdapter(doc, parsedUrl.hostname);
         parsed = parseComposition(rawText);
       } catch (e) {}
@@ -730,12 +562,16 @@
     return parsed;
   }
 
-  const hoverCache = new Map();
-  let currentHoverUrl = null;
+  // --- HOVER PIPELINE & EVENT ATTACHMENT ---
 
-  function executeHoverFetch(url) {
-    if (!url || url === currentHoverUrl) return;
-    currentHoverUrl = url;
+  const hoverCache = new Map();
+  let currentTargetUrl = null;
+
+  function onProductHover(url) {
+    if (!url || url === currentTargetUrl) return;
+    currentTargetUrl = url;
+
+    console.log('[Fabric Inspector] Hovering item:', url);
 
     if (hoverCache.has(url)) {
       const cached = hoverCache.get(url);
@@ -743,21 +579,21 @@
       return;
     }
 
-    // Display skeleton loading badge immediately
+    // Show loading skeleton immediately
     renderLoading('Analyzing composition...');
 
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
-      // Ignore if user has moved on to hover over another product
-      if (currentHoverUrl !== url) return;
+      if (currentTargetUrl !== url) return;
 
-      if (chrome.runtime.lastError || !res || !res.success) {
-        console.warn('[Fabric Inspector] Background fetch failed for URL:', url);
+      if (!res || !res.success) {
+        console.warn('[Fabric Inspector] Failed fetch:', res?.error);
+        renderLoading('No material breakdown found');
         return;
       }
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(res.html, 'text/html');
-      const parsed = inspectParsedDoc(doc, url);
+      const parsed = parseHtmlDoc(doc, url);
 
       hoverCache.set(url, parsed);
 
@@ -766,69 +602,43 @@
       } else {
         renderLoading('No material breakdown found');
         setTimeout(() => {
-          if (currentHoverUrl === url) {
-            document.getElementById('fabric-detector-root')?.remove();
+          if (currentTargetUrl === url) {
+            const shadow = ensureShadowRoot();
+            shadow.querySelector('.fabric-card')?.remove();
           }
         }, 1800);
       }
     });
   }
 
-  // --- POINTER / MOUSEOVER LISTENER ---
+  // Bind mousemove with throttling to guarantee interception across all layers
+  let moveThrottle = null;
 
-  let hoverTimer = null;
+  window.addEventListener('mousemove', (e) => {
+    if (moveThrottle) return;
+    moveThrottle = setTimeout(() => { moveThrottle = null; }, 60);
 
-  function onPointerMove(e) {
-    if (e.target && e.target.closest('#fabric-detector-root')) return;
+    const target = e.target;
+    if (!target) return;
 
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(() => {
-      const target = e.target;
-      if (!target) return;
+    // Check if hovering over our own badge
+    if (target.id === 'fabric-detector-root' || target.closest('#fabric-detector-root')) return;
 
-      // 1. Swatches on detail pages
-      const swatch = target.closest('button, a, label, li, div[class*="swatch"], [data-testid*="swatch"]');
-      if (swatch) {
-        inspectPage(document);
-        return;
-      }
-
-      // 2. Clickable link to product (resolves anchor regardless of nested spans/tooltips)
-      const targetUrl = resolveHoveredProductUrl(target);
-      if (targetUrl) {
-        executeHoverFetch(targetUrl);
-      }
-    }, 120);
-  }
-
-  // Attach using pointerover for faster hit-testing across complex CSS layers
-  document.addEventListener('pointerover', onPointerMove, { passive: true });
-
-  // --- ROUTE & HYDRATION OBSERVER ---
-
-  let lastHref = location.href;
-  let debounceTimeout = null;
-
-  const observer = new MutationObserver(() => {
-    if (location.href !== lastHref) {
-      lastHref = location.href;
-      currentHoverUrl = null;
-      clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(() => inspectPage(document), 500);
+    // Check swatches
+    const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
+    if (swatch) {
+      inspectPage(document);
       return;
     }
 
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-      if (!currentHoverUrl) {
-        inspectPage(document);
-      }
-    }, 1200);
-  });
+    // Check product title/image link
+    const url = findProductUrl(target);
+    if (url) {
+      onProductHover(url);
+    }
+  }, { passive: true });
 
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Initial runs for the active page
+  // Initial runs for detail page
   inspectPage(document);
   setTimeout(() => inspectPage(document), 1000);
   setTimeout(() => inspectPage(document), 2500);
