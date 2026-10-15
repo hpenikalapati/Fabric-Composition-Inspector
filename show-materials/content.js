@@ -29,7 +29,8 @@
     'outer shell', 'shell', 'upper', 'body and lining', 'lining', 'body', 
     'sleeves', 'sleeve', 'filling', 'fill', 'padding', 'trim', 
     'pocketing', 'pockets', 'pocket', 'pocket bag', 'rib', 'cuff', 'collar', 
-    'hood', 'main', 'piece 1', 'piece 2', 'piece 3', 'yoke', 'face', 'back'
+    'hood', 'main', 'piece 1', 'piece 2', 'piece 3', 'yoke', 'face', 'back',
+    'faux fur hood trim', 'fur hood trim', 'hood trim'
   ];
 
   const SITE_ADAPTERS = {
