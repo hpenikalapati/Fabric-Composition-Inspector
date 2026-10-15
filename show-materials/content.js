@@ -405,31 +405,14 @@
   function extractAmazonDirect(doc) {
     if (!doc) return null;
 
-    // 1. Check Amazon's Softlines / Clothing Facts expander and Overview tables
-    const containers = doc.querySelectorAll(
-      '#productFactsDesktopExpander, #productFactsDesktop_feature_div, #productOverview_feature_div, #detailBullets_feature_div, #featurebullets_feature_div, #voyager-ns-desktop-side-sheet-content'
-    );
-
     const collected = [];
 
-    // Extract table rows with explicit spacing between <th>/<td> cells
-    const rows = doc.querySelectorAll(
-      '#productOverview_feature_div tr, #productFactsDesktopExpander tr, table.prodDetTable tr'
-    );
-    for (const row of rows) {
-      const cells = Array.from(row.querySelectorAll('th, td, span')).map(c => (c.textContent || '').trim()).filter(Boolean);
-      const rowText = cells.join(' : ');
-      if (/fabric|material|composition|cotton|polyester|viscose|rayon|spandex|nylon|wool|linen/i.test(rowText)) {
-        collected.push(rowText);
-      }
-    }
-
-    // Extract bullet points and grid divs (used on Amazon fashion templates)
-    for (const container of containers) {
-      const items = container.querySelectorAll('li, div.a-fixed-left-grid-inner, div.a-row, span.a-list-item');
-      for (const item of items) {
-        const text = (item.textContent || '').replace(/\s+/g, ' ').trim();
-        if (text.length < 300 && text.includes('%')) {
+    // 1. Broad text scan of all rows, table cells, and list items in the fetched Amazon doc
+    const nodes = doc.querySelectorAll('tr, li, div.a-row, span.a-list-item, div.po-row');
+    for (const node of nodes) {
+      const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text.length < 250 && /fabric|material|composition|care instructions|shell|lining|cotton|polyester|viscose|rayon|spandex|nylon|wool|linen|modal|tencel|acrylic/i.test(text)) {
+        if (text.includes('%') || text.includes(':')) {
           collected.push(text);
         }
       }
