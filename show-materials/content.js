@@ -9,7 +9,7 @@
 
   // --- 3-TIER FIBER CLASSIFICATION ---
   const NATURAL_FIBERS = [
-    'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 
+    'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 'recycled cotton',
     'linen', 'flax', 'hemp', 'jute', 'alpaca', 'mohair', 'down', 'feather', 'leather', 'suede'
   ];
 
@@ -19,7 +19,8 @@
 
   const SYNTHETIC_FIBERS = [
     'polyester', 'spandex', 'elastane', 'nylon', 'polyamide', 
-    'acrylic', 'polyurethane', 'metallic'
+    'acrylic', 'polyurethane', 'metallic', 'recycled polyester',
+    'recycled polyamide'
   ];
 
   const FIBER_LIST = [...NATURAL_FIBERS, ...SEMI_SYNTHETIC_FIBERS, ...SYNTHETIC_FIBERS];
