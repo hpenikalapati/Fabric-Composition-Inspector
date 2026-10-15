@@ -707,6 +707,49 @@
     }
   }
 
+  const isTarget = currentHost.includes('target.com');
+
+  if (isTarget) {
+    let targetTimer = null;
+    let currentTcin = null;
+  
+    document.addEventListener('mouseover', (e) => {
+      const path = e.composedPath ? e.composedPath() : [];
+      if (path.some(el => el.id === 'fabric-detector-root')) return;
+  
+      for (const el of path) {
+        if (el.tagName === 'A' && el.href) {
+          const match = el.href.match(/\/A-(\d{8,10})/i);
+          if (match) {
+            const tcin = match[1];
+            clearTimeout(targetTimer);
+            targetTimer = setTimeout(() => {
+              if (currentTcin === tcin) return;
+              currentTcin = tcin;
+  
+              renderLoading('Analyzing Target product...');
+              chrome.runtime.sendMessage({ type: 'FETCH_TARGET_HOVER', tcin }, (res) => {
+                if (currentTcin !== tcin) return;
+                if (res && res.success && res.specs) {
+                  const parsed = parseComposition(res.specs);
+                  if (parsed) {
+                    renderBadge(parsed);
+                    return;
+                  }
+                }
+                renderLoading('No material breakdown found');
+                setTimeout(() => {
+                  if (currentTcin === tcin) document.getElementById('fabric-detector-root')?.remove();
+                }, 1500);
+              });
+            }, 90);
+            return;
+          }
+        }
+      }
+    }, { capture: true, passive: true });
+  }
+
   // --- PART 2: OTHER RETAILERS (STRICTLY PRODUCT DETAIL PAGES) ---
 
   if (!isAmazon) {
