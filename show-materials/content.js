@@ -707,42 +707,64 @@
     }
   }
 
+// --- TARGET HOVER ENGINE ---
   const isTarget = currentHost.includes('target.com');
 
   if (isTarget) {
-    let targetTimer = null;
+    const targetCache = new Map();
     let currentTcin = null;
-  
+    let targetTimer = null;
+
+    function handleTargetHover(tcin) {
+      if (!tcin || tcin === currentTcin) return;
+      currentTcin = tcin;
+
+      console.log('[Fabric Inspector] Target TCIN Hovered:', tcin);
+
+      if (targetCache.has(tcin)) {
+        const cached = targetCache.get(tcin);
+        if (cached) renderBadge(cached);
+        return;
+      }
+
+      renderLoading('Analyzing Target product...');
+
+      chrome.runtime.sendMessage({ type: 'FETCH_TARGET_HOVER', tcin }, (res) => {
+        if (currentTcin !== tcin) return;
+
+        if (!res || !res.success || !res.specText) {
+          renderLoading('No material breakdown found');
+          setTimeout(() => {
+            if (currentTcin === tcin) document.getElementById('fabric-detector-root')?.remove();
+          }, 1500);
+          return;
+        }
+
+        const parsed = parseComposition(res.specText);
+        targetCache.set(tcin, parsed);
+
+        if (parsed) {
+          renderBadge(parsed);
+        } else {
+          renderLoading('No material breakdown found');
+          setTimeout(() => {
+            if (currentTcin === tcin) document.getElementById('fabric-detector-root')?.remove();
+          }, 1500);
+        }
+      });
+    }
+
+    // Capture-phase listener for Target catalog/search grids
     document.addEventListener('mouseover', (e) => {
       const path = e.composedPath ? e.composedPath() : [];
       if (path.some(el => el.id === 'fabric-detector-root')) return;
-  
+
       for (const el of path) {
         if (el.tagName === 'A' && el.href) {
           const match = el.href.match(/\/A-(\d{8,10})/i);
           if (match) {
-            const tcin = match[1];
             clearTimeout(targetTimer);
-            targetTimer = setTimeout(() => {
-              if (currentTcin === tcin) return;
-              currentTcin = tcin;
-  
-              renderLoading('Analyzing Target product...');
-              chrome.runtime.sendMessage({ type: 'FETCH_TARGET_HOVER', tcin }, (res) => {
-                if (currentTcin !== tcin) return;
-                if (res && res.success && res.specs) {
-                  const parsed = parseComposition(res.specs);
-                  if (parsed) {
-                    renderBadge(parsed);
-                    return;
-                  }
-                }
-                renderLoading('No material breakdown found');
-                setTimeout(() => {
-                  if (currentTcin === tcin) document.getElementById('fabric-detector-root')?.remove();
-                }, 1500);
-              });
-            }, 90);
+            targetTimer = setTimeout(() => handleTargetHover(match[1]), 90);
             return;
           }
         }
