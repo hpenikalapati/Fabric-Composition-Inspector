@@ -246,7 +246,7 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION PIPELINE ---
+  // --- EXTRACTION LAYERS ---
 
   function extractFromJsonLd(contextDoc) {
     if (!contextDoc) return '';
@@ -550,37 +550,36 @@
     } catch (e) {}
   }
 
-  // --- MULTI-STORE URL RESOLVER ---
+  // --- RELIABLE EVENT PATH RESOLVER ---
 
-  function resolveUrlFromPath(path) {
+  function extractUrlFromPath(path) {
     if (!Array.isArray(path)) return null;
 
     for (const el of path) {
       if (!el || !el.getAttribute) continue;
 
-      // 1. Amazon: data-asin or carousel data-csa-c-item-id
+      // 1. Amazon Direct ASIN
       const asin = el.getAttribute('data-asin') || el.getAttribute('data-csa-c-item-id');
       if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
         return `https://www.amazon.com/dp/${asin.trim()}`;
       }
 
-      // 2. Clickable anchor element
+      // 2. Clickable link anchor
       if (el.tagName === 'A' && el.href) {
         const href = el.href;
 
-        // Amazon redirect or /dp/
         if (href.includes('amazon.com')) {
           const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
           if (match) return `https://www.amazon.com/dp/${match[1]}`;
         }
 
-        // Generic Retail Product Links (Aéropostale, Hollister, Zara, Target, etc.)
         const badWords = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag'];
         const isBad = badWords.some(w => href.toLowerCase().includes(w));
 
-        if (!isBad) {
-          // Check for product path signatures
-          if (href.includes('/p/') || href.includes('/product/') || href.includes('.html') || href.includes('/dp/')) {
+        // Accept links that differ from the current full URL and are inside a product tile or link
+        if (!isBad && href !== window.location.href) {
+          const isTileChild = el.closest('article, [class*="product-tile"], [class*="product-card"], [class*="grid-product"], [class*="item-card"], [class*="ProductCard"], li[class*="product"]');
+          if (isTileChild || href.includes('/p/') || href.includes('/product/') || href.includes('.html')) {
             return href;
           }
         }
@@ -642,15 +641,14 @@
     });
   }
 
-  // --- CAPTURE-PHASE EVENT INTERCEPTION ---
-  // Uses { capture: true } on window so retailer scripts calling stopPropagation() cannot block us
+  // --- CAPTURE-PHASE LISTENER ---
   let hoverTimer = null;
 
-  function onGlobalPointerEvent(e) {
+  function onCapturePointer(e) {
     const path = e.composedPath ? e.composedPath() : [];
     if (path.some(el => el.id === 'fabric-detector-root')) return;
 
-    // Check swatches on PDP
+    // Detail page swatches
     const swatch = path.find(el => el.matches && el.matches('button, a, label, li, div[class*="swatch"]'));
     if (swatch) {
       const parsed = inspectDocument(document, window.location.href);
@@ -658,22 +656,23 @@
       return;
     }
 
-    const url = resolveUrlFromPath(path);
+    const url = extractUrlFromPath(path);
     if (url) {
       clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => handleProductHover(url), 90);
+      hoverTimer = setTimeout(() => handleProductHover(url), 100);
     }
   }
 
-  // Intercept on the downward capture phase
-  window.addEventListener('mouseover', onGlobalPointerEvent, { capture: true, passive: true });
-  window.addEventListener('pointerover', onGlobalPointerEvent, { capture: true, passive: true });
+  // Intercept events during the downward capture phase
+  window.addEventListener('mouseover', onCapturePointer, { capture: true, passive: true });
 
-  // --- DETAIL PAGE ON-LOAD INSPECTION ---
-  const currentPath = window.location.pathname;
-  const isPdpPage = currentPath.includes('/p/') || currentPath.includes('/dp/') || currentPath.includes('/product/') || currentPath.endsWith('.html');
+  // --- RELIABLE PDP-ONLY INITIAL RUN ---
+  // Auto-runs ONLY if an Add-To-Bag/Cart button or size picker exists on the page
+  const hasBuyButton = !!document.querySelector(
+    'button[data-testid*="add-to-bag"], button[class*="add-to-bag"], button[id*="add-to-cart"], input#add-to-cart-button, button[class*="addToCart"]'
+  );
 
-  if (isPdpPage) {
+  if (hasBuyButton) {
     const initialData = inspectDocument(document, window.location.href);
     if (initialData) renderBadge(initialData);
 
