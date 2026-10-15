@@ -4,7 +4,7 @@
   if (window.__fabric_detector_injected) return;
   window.__fabric_detector_injected = true;
 
-  console.log('[Fabric Inspector] Injected on:', window.location.hostname);
+  console.log('[Fabric Inspector] Active on:', window.location.hostname);
 
   const NATURAL_FIBERS = [
     'cotton', 'wool', 'merino wool', 'cashmere', 'silk', 
@@ -177,7 +177,7 @@
     }
   };
 
-  // --- STATE-MACHINE COMPOSITION PARSER ---
+  // --- PARSER ENGINE ---
 
   function parseComposition(rawText) {
     if (!rawText) return null;
@@ -345,41 +345,16 @@
     return parsed;
   }
 
-  // --- DYNAMIC POSITIONING AND UI CONTAINER ---
-
-  let mousePos = { x: window.innerWidth - 320, y: window.innerHeight - 340 };
-
-  window.addEventListener('mousemove', (e) => {
-    // Keep badge near cursor without falling off viewport edges
-    const cardWidth = 300;
-    const cardHeight = 260;
-
-    let posX = e.clientX + 16;
-    let posY = e.clientY + 16;
-
-    if (posX + cardWidth > window.innerWidth) {
-      posX = e.clientX - cardWidth - 16;
-    }
-    if (posY + cardHeight > window.innerHeight) {
-      posY = e.clientY - cardHeight - 16;
-    }
-
-    mousePos.x = Math.max(10, posX);
-    mousePos.y = Math.max(10, posY);
-  }, { passive: true });
+  // --- FIXED BOTTOM-RIGHT SHADOW DOM CONTAINER ---
 
   function getShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
     if (!host) {
       host = document.createElement('div');
       host.id = 'fabric-detector-root';
-      host.style.cssText = 'position: fixed !important; z-index: 2147483647 !important; pointer-events: none !important; display: block !important;';
+      host.style.cssText = 'position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 2147483647 !important; pointer-events: auto !important; display: block !important;';
       (document.body || document.documentElement).appendChild(host);
     }
-
-    // Update coordinates dynamically to track target
-    host.style.left = `${mousePos.x}px`;
-    host.style.top = `${mousePos.y}px`;
 
     let shadow = host.shadowRoot;
     if (!shadow) {
@@ -396,57 +371,56 @@
           color: #569481;
           border-radius: 12px;
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
-          width: 280px;
+          width: 290px;
           overflow: hidden;
           border: 1px solid #e5e7eb;
-          pointer-events: auto;
         }
         .card-header {
           background: #000000;
           color: #ffffff;
-          padding: 8px 12px;
+          padding: 10px 14px;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
         }
         .close-btn {
           background: none;
           border: none;
           color: #569481;
-          font-size: 16px;
+          font-size: 18px;
           cursor: pointer;
           line-height: 1;
         }
         .close-btn:hover { color: #ffffff; }
         .card-body {
-          padding: 10px 12px;
-          max-height: 280px;
+          padding: 12px 14px;
+          max-height: 320px;
           overflow-y: auto;
         }
-        .section-group { margin-bottom: 8px; }
+        .section-group { margin-bottom: 10px; }
         .section-group:last-child { margin-bottom: 0; }
         .section-title {
-          font-size: 10px;
+          font-size: 11px;
           text-transform: uppercase;
           font-weight: 700;
           color: #569481;
-          margin-bottom: 4px;
+          margin-bottom: 6px;
           letter-spacing: 0.05em;
         }
-        .comp-item { margin-bottom: 5px; }
+        .comp-item { margin-bottom: 6px; }
         .comp-meta {
           display: flex;
           justify-content: space-between;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 500;
-          margin-bottom: 2px;
+          margin-bottom: 3px;
           color: #569481;
         }
         .fiber-name { text-transform: capitalize; }
         .bar-track {
-          height: 5px;
+          height: 6px;
           background: #f1f5f9;
           border-radius: 3px;
           overflow: hidden;
@@ -456,13 +430,13 @@
         .fill-semi-synthetic { background: #F5CF27; }
         .fill-synthetic { background: #f7391b; }
         .loading-container {
-          padding: 12px;
+          padding: 16px 14px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 12px;
         }
         .loading-label {
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           color: #569481;
           display: flex;
@@ -470,8 +444,8 @@
           gap: 8px;
         }
         .spinner {
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
           border: 2px solid #e5e7eb;
           border-top-color: #1ce8a9;
           border-radius: 50%;
@@ -479,9 +453,9 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .skeleton-bar {
-          height: 6px;
+          height: 8px;
           background: #e2e8f0;
-          border-radius: 3px;
+          border-radius: 4px;
         }
       `;
       shadow.appendChild(style);
@@ -576,52 +550,51 @@
     } catch (e) {}
   }
 
-  // --- MULTI-STORE PRODUCT URL RESOLVER ---
+  // --- MULTI-STORE PRODUCT URL RESOLVER VIA EVENT PATH ---
 
-  function extractProductUrlFromElement(target) {
-    if (!target) return null;
+  function getProductUrlFromEvent(e) {
+    const path = e.composedPath ? e.composedPath() : [];
 
-    // 1. Amazon direct tile ASIN
-    const asinElement = target.closest('[data-asin], [data-csa-c-item-id]');
-    if (asinElement) {
-      const asin = asinElement.getAttribute('data-asin') || asinElement.getAttribute('data-csa-c-item-id');
+    for (const el of path) {
+      if (!el || !el.getAttribute) continue;
+
+      // Amazon Card or Carousel Item (data-asin or data-csa-c-item-id)
+      const asin = el.getAttribute('data-asin') || el.getAttribute('data-csa-c-item-id');
       if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
         return `https://www.amazon.com/dp/${asin.trim()}`;
       }
-    }
 
-    // 2. Climb tree for the clickable anchor
-    const anchor = target.closest('a[href]');
-    if (!anchor || !anchor.href) return null;
+      // Check anchor tag anywhere in clicked/hovered hierarchy
+      if (el.tagName === 'A' && el.href) {
+        const href = el.href;
 
-    const href = anchor.href;
+        // Amazon redirect or /dp/
+        if (href.includes('amazon.com')) {
+          const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
+          if (match) return `https://www.amazon.com/dp/${match[1]}`;
+        }
 
-    // Amazon link
-    if (href.includes('amazon.com')) {
-      const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-      if (match) return `https://www.amazon.com/dp/${match[1]}`;
-    }
+        // Standard Retail Product Link
+        const isProductUrl = href.includes('/p/') || href.includes('/product/') || href.includes('.html') || href.includes('/dp/');
+        const badWords = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag'];
 
-    // Hollister / Abercrombie / Retail product path matching
-    // Must contain /p/, /product/, or .html
-    const isPdpLink = href.includes('/p/') || href.includes('/product/') || href.includes('.html') || href.includes('/dp/');
-    const badWords = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help', '/bag', '/category'];
-
-    if (isPdpLink && !badWords.some(w => href.toLowerCase().includes(w))) {
-      return href;
+        if (isProductUrl && !badWords.some(w => href.toLowerCase().includes(w))) {
+          return href;
+        }
+      }
     }
 
     return null;
   }
 
-  // --- HOVER PIPELINE & EVENT ATTACHMENT ---
+  // --- HOVER DISPATCHER ---
 
   const hoverCache = new Map();
-  let currentHoverUrl = null;
+  let currentTargetUrl = null;
 
-  function triggerHoverInspection(url) {
-    if (!url || url === currentHoverUrl) return;
-    currentHoverUrl = url;
+  function handleProductHover(url) {
+    if (!url || url === currentTargetUrl) return;
+    currentTargetUrl = url;
 
     console.log('[Fabric Inspector] Target Hover URL:', url);
 
@@ -634,13 +607,13 @@
     renderLoading('Analyzing composition...');
 
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
-      if (currentHoverUrl !== url) return;
+      if (currentTargetUrl !== url) return;
 
       if (!res || !res.success || !res.html) {
         console.warn('[Fabric Inspector] Fetch failed for:', url, res?.error);
         renderLoading('No material breakdown found');
         setTimeout(() => {
-          if (currentHoverUrl === url) {
+          if (currentTargetUrl === url) {
             document.getElementById('fabric-detector-root')?.remove();
           }
         }, 1500);
@@ -658,7 +631,7 @@
       } else {
         renderLoading('No material breakdown found');
         setTimeout(() => {
-          if (currentHoverUrl === url) {
+          if (currentTargetUrl === url) {
             document.getElementById('fabric-detector-root')?.remove();
           }
         }, 1500);
@@ -666,33 +639,35 @@
     });
   }
 
+  // --- MOUSEOVER LISTENER (INSTANT EVENT BUBBLING) ---
+
   let hoverTimer = null;
 
   document.addEventListener('mouseover', (e) => {
-    const target = e.target;
-    if (!target || target.id === 'fabric-detector-root' || target.closest('#fabric-detector-root')) return;
+    const path = e.composedPath ? e.composedPath() : [];
+    if (path.some(el => el.id === 'fabric-detector-root')) return;
 
-    // Swatches on active page
-    const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
+    // Swatches on active PDP
+    const swatch = path.find(el => el.matches && el.matches('button, a, label, li, div[class*="swatch"]'));
     if (swatch) {
       const parsed = inspectDocument(document, window.location.href);
       if (parsed) renderBadge(parsed);
       return;
     }
 
-    const url = extractProductUrlFromElement(target);
+    const url = getProductUrlFromEvent(e);
     if (url) {
       clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => triggerHoverInspection(url), 100);
+      hoverTimer = setTimeout(() => handleProductHover(url), 100);
     }
   }, { passive: true });
 
-  // --- SAFE INITIAL EXECUTION (PDP ONLY) ---
-  // Only auto-inspect on initial load if the current page is an actual Product Detail Page
+  // --- INITIAL EXECUTION (PDP ONLY) ---
+  // Only runs auto-inspection on product detail pages, NEVER on search/category grids
   const currentPath = window.location.pathname;
-  const isDetailPage = currentPath.includes('/p/') || currentPath.includes('/dp/') || currentPath.includes('/product/') || currentPath.endsWith('.html');
+  const isPdpPage = currentPath.includes('/p/') || currentPath.includes('/dp/') || currentPath.includes('/product/') || currentPath.endsWith('.html');
 
-  if (isDetailPage) {
+  if (isPdpPage) {
     const initialData = inspectDocument(document, window.location.href);
     if (initialData) renderBadge(initialData);
 
