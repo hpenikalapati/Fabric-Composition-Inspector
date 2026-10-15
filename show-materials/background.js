@@ -25,15 +25,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (cache.has(url)) {
       sendResponse({ success: true, html: cache.get(url) });
-      return true;
+      return false;
     }
 
     fetch(url, {
       method: 'GET',
       credentials: 'include',
       headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Upgrade-Insecure-Requests': '1'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     })
       .then(res => {
@@ -45,10 +44,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.warn('[Fabric Inspector] Background fetch failed for:', url, err);
+        console.warn('[Fabric Inspector] Fetch failed:', err);
         sendResponse({ success: false, error: err.message });
       });
 
-    return true; // Keep message channel open for async response
+    return true; // Keeps message channel open
   }
 });
