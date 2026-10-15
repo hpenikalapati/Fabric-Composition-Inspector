@@ -1,13 +1,12 @@
 // background.js
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Fabric Inspector] Background worker installed.');
+  console.log('[Fabric Inspector] Background service worker ready.');
 });
 
 const cache = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Action badge updates
   if (message.type === 'FABRIC_DETECTED' && sender.tab) {
     const tabId = sender.tab.id;
     const count = message.count || 0;
@@ -21,16 +20,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.action.setBadgeText({ tabId: sender.tab.id, text: '' });
   }
 
-  // Delegated background fetch for hovered product links
   if (message.type === 'FETCH_HOVER_HTML') {
-    const targetUrl = message.url;
+    const { url } = message;
 
-    if (cache.has(targetUrl)) {
-      sendResponse({ success: true, html: cache.get(targetUrl) });
+    if (cache.has(url)) {
+      sendResponse({ success: true, html: cache.get(url) });
       return true;
     }
 
-    fetch(targetUrl, {
+    fetch(url, {
       method: 'GET',
       credentials: 'include',
       headers: {
@@ -43,14 +41,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return res.text();
       })
       .then(html => {
-        cache.set(targetUrl, html);
+        cache.set(url, html);
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.warn('[Fabric Inspector] Hover fetch failed:', err);
+        console.warn('[Fabric Inspector] Background fetch failed for:', url, err);
         sendResponse({ success: false, error: err.message });
       });
 
-    return true; // Keep channel open for async response
+    return true; // Keep message channel open for async response
   }
 });
