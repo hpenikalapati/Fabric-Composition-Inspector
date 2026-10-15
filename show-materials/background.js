@@ -21,45 +21,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  // Target-exclusive hover fetcher
-  if (message.type === 'FETCH_TARGET_HOVER') {
-    const tcin = message.tcin;
-    const apiUrl = `https://redsky.target.com/redsky_aggregations/v1/web/pdp_client_v1?key=9f36aeafbe60771e321a7cc95a78140772ab3e96&tcin=${tcin}&pricing_store_id=3991`;
-
-    if (cache.has(tcin)) {
-      sendResponse({ success: true, specText: cache.get(tcin) });
-      return false;
-    }
-
-    fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP status ${res.status}`);
-        return res.json();
-      })
-      .then(json => {
-        const desc = json?.data?.product?.item?.product_description || {};
-        
-        // Target fabric data lives in soft_goods_specifications or bullet_descriptions
-        const softGoods = desc.soft_goods_specifications || '';
-        const bullets = Array.isArray(desc.bullet_descriptions) ? desc.bullet_descriptions.join('\n') : '';
-        const combined = `${softGoods}\n${bullets}`;
-
-        cache.set(tcin, combined);
-        sendResponse({ success: true, specText: combined });
-      })
-      .catch(err => {
-        console.warn('[Fabric Inspector] Target API fetch error:', err);
-        sendResponse({ success: false, error: err.message });
-      });
-
-    return true; // Keep channel open
-  }
-  
   // Amazon-exclusive hover fetcher
   if (message.type === 'FETCH_AMAZON_HOVER') {
     const asin = message.asin;
