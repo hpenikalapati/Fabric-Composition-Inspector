@@ -4,7 +4,7 @@
   if (window.__fabric_detector_injected) return;
   window.__fabric_detector_injected = true;
 
-  console.log('[Fabric Inspector] Injected into:', window.location.hostname);
+  console.log('[Fabric Inspector] Injected on:', window.location.hostname);
 
   // Fiber Classification
   const NATURAL_FIBERS = [
@@ -53,11 +53,7 @@
         'div[data-testid="equity-group"] ul[class*="list"] li',
         'div[data-testid="equity-group"]',
         '.accordion-body-visible'
-      ],
-      preAction: () => {
-        const btn = document.querySelector('button[data-test-panel-link][aria-expanded="false"]');
-        if (btn) btn.click();
-      }
+      ]
     },
     'aeropostale.com': {
       selectors: [
@@ -71,36 +67,21 @@
         '#collapsible-details-1 ul li',
         '#collapsible-details-1',
         '#product_detail_accordion_content-1'
-      ],
-      preAction: () => {
-        const header = document.querySelector('#product_detail_accordion .accordion-header, h2[class*="accordion-header"]');
-        const content = document.querySelector('#product_detail_accordion_content-1');
-        if (header && content && !content.classList.contains('show')) {
-          header.click();
-        }
-      }
+      ]
     },
     'target.com': {
       selectors: [
         'div[data-test="item-details-specifications"] div:has(> b)',
         'div[data-test="item-details-specifications"]',
         '#specAndDescript'
-      ],
-      preAction: () => {
-        const specButton = document.querySelector('button[id*="specifications-accordion"][aria-expanded="false"]');
-        if (specButton) specButton.click();
-      }
+      ]
     },
     'walmart.com': {
       selectors: [
         'div[data-testid="ui-collapse-panel"] div.nt1 span',
         'div[data-testid="specifications"]',
         'section#specifications-wrapper'
-      ],
-      preAction: () => {
-        const expandBtn = document.querySelector('button[data-testid="ui-collapse-panel-header"][aria-expanded="false"], section#specifications-wrapper button');
-        if (expandBtn) expandBtn.click();
-      }
+      ]
     },
     'oldnavy.gap.com': {
       selectors: [
@@ -121,11 +102,7 @@
         'div[class*="fds_panel_details-content"] ul[class*="product-information-item__list"] li',
         'div[class*="fds_panel_details-content"]',
         '#pdp-product-info-container'
-      ],
-      preAction: () => {
-        const panel = document.querySelector('.productInformationItem button[aria-expanded="false"]');
-        if (panel) panel.click();
-      }
+      ]
     },
     'nordstrom.com': {
       selectors: [
@@ -146,47 +123,28 @@
         'span.description-content__val-content',
         'div[class*="description-content__list-text-val"]',
         'div.description-content'
-      ],
-      preAction: () => {
-        const viewMoreBtn = document.querySelector('button.new-goods-attr__view-more');
-        if (viewMoreBtn) viewMoreBtn.click();
-      }
+      ]
     },
     'asos.com': {
       selectors: [
         '#productDescriptionDetails div[class*="F_yff"]',
         'div[data-testid="productDescriptionDetails"]',
         '#productDescriptionDetails'
-      ],
-      preAction: () => {
-        const btn = document.querySelector('#productDescriptionDetails h2[data-testid="heading"]');
-        const wrapper = document.querySelector('#productDescriptionDetails');
-        if (btn && wrapper && wrapper.style.visibility === 'hidden') {
-          btn.click();
-        }
-      }
+      ]
     },
     'jcrew.com': {
       selectors: [
         'ul[class*="ProductDetails_tech-list"] li[class*="ProductDetails_tech-item"]',
         'ul[class*="ProductDetails_tech-list"]',
         'div[class*="ProductDetails_product-details-content"]'
-      ],
-      preAction: () => {
-        const accordionBtn = document.querySelector('button[aria-controls="accordion-panel--r2"][aria-expanded="false"]');
-        if (accordionBtn) accordionBtn.click();
-      }
+      ]
     },
     'uniqlo.com': {
       selectors: [
         '#productMaterialDescription-content p[data-testid="ITOTypography"]',
         'div[id="productMaterialDescription-content"]',
         'div[data-testid="ITOTypography"]'
-      ],
-      preAction: () => {
-        const accordionBtn = document.querySelector('button[aria-controls*="productMaterialDescription"][aria-expanded="false"]');
-        if (accordionBtn) accordionBtn.click();
-      }
+      ]
     },
     'hm.com': {
       selectors: [
@@ -195,36 +153,21 @@
         'div#sectionMaterialsAndCareAccordion',
         'dl[class*="materials"] dd',
         'section[class*="MaterialsAndCare"]'
-      ],
-      preAction: () => {
-        const toggle = document.querySelector('#toggle-materialsAndCareAccordion[aria-expanded="false"], button[aria-controls*="materialsAndCare"]');
-        if (toggle) toggle.click();
-      }
+      ]
     },
     'urbanoutfitters.com': {
       selectors: [
         'div.s-pwa-cms.c-pwa-markdown p',
         'div[class*="c-pwa-product-details__details"] p',
         'div[class*="c-pwa-product-details__details"]'
-      ],
-      preAction: () => {
-        const accordion = document.querySelector('div[class*="c-pwa-product-details__details"] h2');
-        const panel = document.querySelector('.o-pwa-accordion__panel');
-        if (accordion && panel && (panel.style.display === 'none' || panel.hidden)) {
-          accordion.click();
-        }
-      }
+      ]
     },
     'hollisterco.com': {
       selectors: [
         'h4.fabric-care-mfe__label',
         'div[data-testid="fabric-care-mfe"]',
         '#details-accordion-panel-id'
-      ],
-      preAction: () => {
-        const btn = document.querySelector('div[data-testid="accordion-header"][aria-expanded="false"]');
-        if (btn) btn.click();
-      }
+      ]
     },
     'abercrombie.com': {
       selectors: [
@@ -304,9 +247,10 @@
     return sections.length > 0 ? sections : null;
   }
 
-  // --- EXTRACTION LAYERS ---
+  // --- EXTRACTION PIPELINE ---
 
-  function extractFromJsonLd(contextDoc = document) {
+  function extractFromJsonLd(contextDoc) {
+    if (!contextDoc) return '';
     const scripts = contextDoc.querySelectorAll('script[type="application/ld+json"]');
     const texts = [];
     for (const script of scripts) {
@@ -324,19 +268,16 @@
     return texts.join(' \n ');
   }
 
-  function extractFromAdapter(contextDoc = document, targetHost = window.location.hostname) {
+  function extractFromAdapter(contextDoc, targetHost = window.location.hostname) {
+    if (!contextDoc) return '';
     const host = targetHost.replace(/^www\./, '');
     const sortedKeys = Object.keys(SITE_ADAPTERS).sort((a, b) => b.length - a.length);
     const adapterKey = sortedKeys.find(domain => host.endsWith(domain));
 
     if (!adapterKey) return '';
     const adapter = SITE_ADAPTERS[adapterKey];
-
-    if (adapter.preAction && contextDoc === document) {
-      try { adapter.preAction(); } catch (e) {}
-    }
-
     const matches = [];
+
     for (const sel of adapter.selectors) {
       const elements = contextDoc.querySelectorAll(sel);
       for (const el of elements) {
@@ -346,7 +287,8 @@
     return matches.join(' \n ');
   }
 
-  function extractFromGenericDOM(contextDoc = document) {
+  function extractFromGenericDOM(contextDoc) {
+    if (!contextDoc) return '';
     const candidateNodes = contextDoc.querySelectorAll('li, p, tr, dd, [class*="spec"], [class*="detail"]');
     const relevant = [];
     for (const node of candidateNodes) {
@@ -360,7 +302,8 @@
     return relevant.join(' \n ');
   }
 
-  function extractAmazonDirect(contextDoc = document) {
+  function extractAmazonDirect(contextDoc) {
+    if (!contextDoc) return null;
     const rows = contextDoc.querySelectorAll(
       '#productOverview_feature_div tr, #voyager-ns-desktop-side-sheet-content table.prodDetTable tr, #detailBullets_feature_div li'
     );
@@ -373,14 +316,45 @@
     return null;
   }
 
-  // --- SHADOW DOM UI ROOT ---
+  function inspectDocument(doc, targetUrl = window.location.href) {
+    if (!doc) return null;
+    let parsed = null;
 
-  function ensureShadowRoot() {
+    if (targetUrl.includes('amazon.com')) {
+      const amazonText = extractAmazonDirect(doc);
+      if (amazonText) parsed = parseComposition(amazonText);
+    }
+
+    if (!parsed) {
+      try {
+        const parsedUrl = new URL(targetUrl);
+        const rawText = extractFromAdapter(doc, parsedUrl.hostname);
+        parsed = parseComposition(rawText);
+      } catch (e) {}
+    }
+
+    if (!parsed) {
+      const rawText = extractFromJsonLd(doc);
+      parsed = parseComposition(rawText);
+    }
+
+    if (!parsed) {
+      const rawText = extractFromGenericDOM(doc);
+      parsed = parseComposition(rawText);
+    }
+
+    return parsed;
+  }
+
+  // --- RELIABLE UI CONTAINER (ATTACHED DIRECTLY TO BODY) ---
+
+  function getShadowRoot() {
     let host = document.getElementById('fabric-detector-root');
     if (!host) {
       host = document.createElement('div');
       host.id = 'fabric-detector-root';
-      (document.documentElement || document.body).appendChild(host);
+      host.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 2147483647; pointer-events: auto;';
+      document.body.appendChild(host);
     }
 
     let shadow = host.shadowRoot;
@@ -391,131 +365,98 @@
     if (!shadow.querySelector('style')) {
       const style = document.createElement('style');
       style.textContent = `
-        :host {
-          all: initial;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         .fabric-card {
-          position: fixed !important;
-          bottom: 24px !important;
-          right: 24px !important;
-          z-index: 2147483647 !important;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-          background: #ffffff !important;
-          color: #569481 !important;
-          border-radius: 12px !important;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
-          width: 290px !important;
-          overflow: hidden !important;
-          border: 1px solid #e5e7eb !important;
-          box-sizing: border-box !important;
-          pointer-events: auto !important;
-        }
-        .fabric-card *, .fabric-card *::before, .fabric-card *::after {
-          box-sizing: border-box !important;
+          background: #ffffff;
+          color: #569481;
+          border-radius: 12px;
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.22);
+          width: 290px;
+          overflow: hidden;
+          border: 1px solid #e5e7eb;
         }
         .card-header {
-          background: #000000 !important;
-          color: #ffffff !important;
-          padding: 10px 14px !important;
-          display: flex !important;
-          justify-content: space-between !important;
-          align-items: center !important;
-          font-size: 13px !important;
-          font-weight: 600 !important;
-          letter-spacing: 0.02em !important;
+          background: #000000;
+          color: #ffffff;
+          padding: 10px 14px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13px;
+          font-weight: 600;
         }
         .close-btn {
-          background: none !important;
-          border: none !important;
-          color: #569481 !important;
-          font-size: 18px !important;
-          cursor: pointer !important;
-          line-height: 1 !important;
-          padding: 0 !important;
+          background: none;
+          border: none;
+          color: #569481;
+          font-size: 18px;
+          cursor: pointer;
+          line-height: 1;
         }
-        .close-btn:hover {
-          color: #ffffff !important;
-        }
+        .close-btn:hover { color: #ffffff; }
         .card-body {
-          padding: 12px 14px !important;
-          max-height: 320px !important;
-          overflow-y: auto !important;
+          padding: 12px 14px;
+          max-height: 320px;
+          overflow-y: auto;
         }
-        .section-group {
-          margin-bottom: 10px !important;
-        }
-        .section-group:last-child {
-          margin-bottom: 0 !important;
-        }
+        .section-group { margin-bottom: 10px; }
+        .section-group:last-child { margin-bottom: 0; }
         .section-title {
-          font-size: 11px !important;
-          text-transform: uppercase !important;
-          font-weight: 700 !important;
-          color: #569481 !important;
-          margin-bottom: 6px !important;
-          letter-spacing: 0.05em !important;
+          font-size: 11px;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: #569481;
+          margin-bottom: 6px;
+          letter-spacing: 0.05em;
         }
-        .comp-item {
-          margin-bottom: 6px !important;
-        }
+        .comp-item { margin-bottom: 6px; }
         .comp-meta {
-          display: flex !important;
-          justify-content: space-between !important;
-          font-size: 12px !important;
-          font-weight: 500 !important;
-          margin-bottom: 3px !important;
-          color: #569481 !important;
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          font-weight: 500;
+          margin-bottom: 3px;
+          color: #569481;
         }
-        .fiber-name {
-          text-transform: capitalize !important;
-        }
+        .fiber-name { text-transform: capitalize; }
         .bar-track {
-          height: 6px !important;
-          background: #f1f5f9 !important;
-          border-radius: 3px !important;
-          overflow: hidden !important;
+          height: 6px;
+          background: #f1f5f9;
+          border-radius: 3px;
+          overflow: hidden;
         }
-        .bar-fill {
-          height: 100% !important;
-          border-radius: 3px !important;
-          transition: width 0.3s ease !important;
-        }
-
-        /* Color Hierarchy */
-        .fill-natural { background: #1ce8a9 !important; }
-        .fill-semi-synthetic { background: #F5CF27 !important; }
-        .fill-synthetic { background: #f7391b !important; }
-
-        /* Loading Skeleton */
+        .bar-fill { height: 100%; border-radius: 3px; }
+        .fill-natural { background: #1ce8a9; }
+        .fill-semi-synthetic { background: #F5CF27; }
+        .fill-synthetic { background: #f7391b; }
         .loading-container {
-          padding: 16px 14px !important;
-          display: flex !important;
-          flex-direction: column !important;
-          gap: 12px !important;
+          padding: 16px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
         }
         .loading-label {
-          font-size: 13px !important;
-          font-weight: 600 !important;
-          color: #569481 !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 8px !important;
+          font-size: 13px;
+          font-weight: 600;
+          color: #569481;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
         .spinner {
-          width: 14px !important;
-          height: 14px !important;
-          border: 2px solid #e5e7eb !important;
-          border-top-color: #1ce8a9 !important;
-          border-radius: 50% !important;
-          animation: spin 0.8s linear infinite !important;
+          width: 14px;
+          height: 14px;
+          border: 2px solid #e5e7eb;
+          border-top-color: #1ce8a9;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .skeleton-bar {
-          height: 8px !important;
-          background: #e2e8f0 !important;
-          border-radius: 4px !important;
+          height: 8px;
+          background: #e2e8f0;
+          border-radius: 4px;
         }
       `;
       shadow.appendChild(style);
@@ -532,9 +473,8 @@
   }
 
   function renderLoading(title = 'Analyzing composition...') {
-    const shadow = ensureShadowRoot();
-    const existingCard = shadow.querySelector('.fabric-card');
-    if (existingCard) existingCard.remove();
+    const shadow = getShadowRoot();
+    shadow.querySelector('.fabric-card')?.remove();
 
     const card = document.createElement('div');
     card.className = 'fabric-card';
@@ -558,15 +498,13 @@
   }
 
   function renderBadge(sections) {
-    const shadow = ensureShadowRoot();
-    const existingCard = shadow.querySelector('.fabric-card');
-    if (existingCard) existingCard.remove();
+    const shadow = getShadowRoot();
+    shadow.querySelector('.fabric-card')?.remove();
 
     const card = document.createElement('div');
     card.className = 'fabric-card';
 
     let bodyContent = '';
-
     sections.forEach(sec => {
       bodyContent += `<div class="section-group">`;
       if (sections.length > 1 || sec.name !== 'General') {
@@ -609,115 +547,27 @@
     } catch (e) {}
   }
 
-  // --- CURRENT PAGE INSPECTION ---
+  // --- SAME-ORIGIN BACKGROUND PAGE PRE-LOADER ---
 
-  function inspectPage(context = document) {
-    let parsed = null;
-
-    if (window.location.hostname.includes('amazon.com')) {
-      const amazonText = extractAmazonDirect(context);
-      if (amazonText) parsed = parseComposition(amazonText);
-    }
-
-    if (!parsed) {
-      const rawText = extractFromAdapter(context);
-      parsed = parseComposition(rawText);
-    }
-
-    if (!parsed) {
-      const rawText = extractFromJsonLd(context);
-      parsed = parseComposition(rawText);
-    }
-
-    if (!parsed) {
-      const rawText = extractFromGenericDOM(context);
-      parsed = parseComposition(rawText);
-    }
-
-    if (parsed) {
-      renderBadge(parsed);
-    }
-  }
-
-  // --- UNIVERSAL URL RESOLUTION FOR HOVER ---
-
-  function findProductUrl(element) {
-    if (!element) return null;
-
-    // 1. Amazon direct tile ASIN
-    const amazonCard = element.closest('[data-asin]');
-    if (amazonCard && amazonCard.dataset.asin && amazonCard.dataset.asin.length === 10) {
-      return `https://www.amazon.com/dp/${amazonCard.dataset.asin}`;
-    }
-
-    // 2. Climb tree for product anchor
-    const anchor = element.closest('a[href]');
-    if (!anchor) return null;
-
-    const href = anchor.href;
-
-    // Check Amazon URL
-    if (href.includes('amazon.com')) {
-      const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-      if (match) return `https://www.amazon.com/dp/${match[1]}`;
-    }
-
-    // Universal Retail Link Filtering
-    const excludedPatterns = [
-      '#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login',
-      '/bag', '/stores', '/help', '/wishlist', '/category', '/search'
-    ];
-    if (excludedPatterns.some(p => href.toLowerCase().includes(p))) return null;
-
-    // Discard identical page or pure query swaps on current item
-    const cleanCurrent = window.location.href.split('?')[0].split('#')[0];
-    const cleanTarget = href.split('?')[0].split('#')[0];
-    if (cleanTarget === cleanCurrent) return null;
-
-    return href;
-  }
-
-  // --- HTML INSPECTION FOR FETCHED DOCUMENTS ---
-
-  function parseHtmlDoc(doc, url) {
-    let parsed = null;
-
-    if (url.includes('amazon.com')) {
-      const amazonText = extractAmazonDirect(doc);
-      if (amazonText) parsed = parseComposition(amazonText);
-    }
-
-    if (!parsed) {
-      try {
-        const parsedUrl = new URL(url);
-        const rawText = extractFromAdapter(doc, parsedUrl.hostname);
-        parsed = parseComposition(rawText);
-      } catch (e) {}
-    }
-
-    if (!parsed) {
-      const rawText = extractFromJsonLd(doc);
-      parsed = parseComposition(rawText);
-    }
-
-    if (!parsed) {
-      const rawText = extractFromGenericDOM(doc);
-      parsed = parseComposition(rawText);
-    }
-
-    return parsed;
-  }
-
-  // --- HOVER PIPELINE & CACHE ---
-
+  let bgLoaderFrame = null;
   const hoverCache = new Map();
-  let currentTargetUrl = null;
+  let activeHoverUrl = null;
 
-  function onProductHover(url, targetElement) {
-    if (!url || url === currentTargetUrl) return;
-    currentTargetUrl = url;
+  function getOrCreateBackgroundFrame() {
+    if (!bgLoaderFrame) {
+      bgLoaderFrame = document.createElement('iframe');
+      bgLoaderFrame.id = 'fabric-inspector-bg-loader';
+      bgLoaderFrame.style.cssText = 'position: absolute !important; width: 1px !important; height: 1px !important; top: -9999px !important; left: -9999px !important; opacity: 0 !important; pointer-events: none !important; border: 0 !important;';
+      document.body.appendChild(bgLoaderFrame);
+    }
+    return bgLoaderFrame;
+  }
 
-    console.log('[Fabric Inspector] Target Hover URL:', url);
+  function loadUrlInBackground(url) {
+    if (!url || url === activeHoverUrl) return;
+    activeHoverUrl = url;
+
+    console.log('[Fabric Inspector] Pre-loading URL in background:', url);
 
     if (hoverCache.has(url)) {
       const cached = hoverCache.get(url);
@@ -725,54 +575,101 @@
       return;
     }
 
-    // Check if the card itself on the current page already contains the fabric percentage
-    const tile = targetElement ? targetElement.closest('article, .product-card, [data-component-type="s-search-result"], div[class*="product-grid"], li[class*="product"]') : null;
-    if (tile) {
-      const tileComposition = parseComposition(tile.innerText || '');
-      if (tileComposition) {
-        hoverCache.set(url, tileComposition);
-        renderBadge(tileComposition);
-        return;
-      }
-    }
-
     renderLoading('Analyzing composition...');
 
+    // Try fast fetch via background service worker first (instant on Amazon/SSR)
     chrome.runtime.sendMessage({ type: 'FETCH_HOVER_HTML', url }, (res) => {
-      if (currentTargetUrl !== url) return;
+      if (activeHoverUrl !== url) return;
 
-      if (!res || !res.success) {
-        console.warn('[Fabric Inspector] Fetch failed for:', url, res?.error);
-        renderLoading('No material breakdown found');
-        return;
+      if (res && res.success && res.html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(res.html, 'text/html');
+        const parsed = inspectDocument(doc, url);
+
+        if (parsed) {
+          hoverCache.set(url, parsed);
+          renderBadge(parsed);
+          return;
+        }
       }
 
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(res.html, 'text/html');
-      const parsed = parseHtmlDoc(doc, url);
+      // If raw HTML fetch had no material data (SPA sites like Zara, Target, Hollister),
+      // load the URL in our same-origin background iframe so its client-side JavaScript executes
+      const frame = getOrCreateBackgroundFrame();
+      
+      const onFrameLoad = () => {
+        frame.removeEventListener('load', onFrameLoad);
+        if (activeHoverUrl !== url) return;
 
-      hoverCache.set(url, parsed);
-
-      if (parsed) {
-        renderBadge(parsed);
-      } else {
-        renderLoading('No material breakdown found');
+        // Allow 350ms for client hydration (React/Vue/MFE components)
         setTimeout(() => {
-          if (currentTargetUrl === url) {
-            const shadow = ensureShadowRoot();
-            shadow.querySelector('.fabric-card')?.remove();
+          try {
+            const frameDoc = frame.contentDocument || frame.contentWindow?.document;
+            const spaParsed = inspectDocument(frameDoc, url);
+
+            hoverCache.set(url, spaParsed);
+
+            if (spaParsed) {
+              renderBadge(spaParsed);
+            } else {
+              renderLoading('No material breakdown found');
+              setTimeout(() => {
+                if (activeHoverUrl === url) {
+                  getShadowRoot().querySelector('.fabric-card')?.remove();
+                }
+              }, 1800);
+            }
+          } catch (e) {
+            console.warn('[Fabric Inspector] Same-origin read error:', e);
           }
-        }, 1800);
-      }
+        }, 350);
+      };
+
+      frame.addEventListener('load', onFrameLoad);
+      frame.src = url;
     });
   }
 
-  // Window-level mousemove tracking throttled to 60ms for immediate event capture
+  // --- CANONICAL URL RESOLVER ---
+
+  function resolveLinkToProductUrl(el) {
+    if (!el) return null;
+
+    // Amazon: Check tile ASIN
+    const amazonTile = el.closest('[data-asin]');
+    if (amazonTile && amazonTile.dataset.asin && amazonTile.dataset.asin.length === 10) {
+      return `https://www.amazon.com/dp/${amazonTile.dataset.asin}`;
+    }
+
+    // Nearest anchor
+    const anchor = el.closest('a[href]');
+    if (!anchor || !anchor.href) return null;
+
+    const href = anchor.href;
+
+    if (href.includes('amazon.com')) {
+      const match = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
+      if (match) return `https://www.amazon.com/dp/${match[1]}`;
+    }
+
+    const ignored = ['#', 'javascript:', '/cart', '/checkout', '/account', '/signin', '/login', '/stores', '/help'];
+    if (ignored.some(pattern => href.toLowerCase().includes(pattern))) return null;
+
+    // Ignore current page
+    const cleanCurrent = window.location.href.split('?')[0].split('#')[0];
+    const cleanTarget = href.split('?')[0].split('#')[0];
+    if (cleanTarget === cleanCurrent) return null;
+
+    return href;
+  }
+
+  // --- HOVER LISTENER ---
+
   let moveThrottle = null;
 
   window.addEventListener('mousemove', (e) => {
     if (moveThrottle) return;
-    moveThrottle = setTimeout(() => { moveThrottle = null; }, 60);
+    moveThrottle = setTimeout(() => { moveThrottle = null; }, 50);
 
     const target = e.target;
     if (!target) return;
@@ -780,44 +677,26 @@
     if (target.id === 'fabric-detector-root' || target.closest('#fabric-detector-root')) return;
 
     // Swatches on active page
-    const swatch = target.closest('button, a, label, li, div[class*="swatch"], [data-testid*="swatch"]');
+    const swatch = target.closest('button, a, label, li, div[class*="swatch"]');
     if (swatch) {
-      inspectPage(document);
+      const parsed = inspectDocument(document, window.location.href);
+      if (parsed) renderBadge(parsed);
       return;
     }
 
     // Product Title Links or Product Cards
-    const url = findProductUrl(target);
+    const url = resolveLinkToProductUrl(target);
     if (url) {
-      onProductHover(url, target);
+      loadUrlInBackground(url);
     }
   }, { passive: true });
 
-  // SPA Route Watcher
-  let lastHref = location.href;
-  let debounceTimeout = null;
+  // Inspect detail page on load
+  const initialData = inspectDocument(document, window.location.href);
+  if (initialData) renderBadge(initialData);
 
-  const observer = new MutationObserver(() => {
-    if (location.href !== lastHref) {
-      lastHref = location.href;
-      currentTargetUrl = null;
-      clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(() => inspectPage(document), 500);
-      return;
-    }
-
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-      if (!currentTargetUrl) {
-        inspectPage(document);
-      }
-    }, 1200);
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Initial runs for the active page
-  inspectPage(document);
-  setTimeout(() => inspectPage(document), 1000);
-  setTimeout(() => inspectPage(document), 2500);
+  setTimeout(() => {
+    const retryData = inspectDocument(document, window.location.href);
+    if (retryData) renderBadge(retryData);
+  }, 1200);
 })();
