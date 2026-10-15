@@ -6,7 +6,12 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  }
+  },
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon16.png"
+  },
   "description": "Automatically extracts fabric & material composition across major clothing retailers.",
   "permissions": ["activeTab", "scripting"],
   "host_permissions": [
