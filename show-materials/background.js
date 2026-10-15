@@ -1,14 +1,13 @@
 // background.js
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Fabric Inspector] Service Worker installed.');
+  console.log('[Fabric Inspector] Background worker installed.');
 });
 
-// Cache HTML fetches in background memory to avoid redundant requests
-const fetchCache = new Map();
+const cache = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // 1. Badge indicator updates
+  // Action badge updates
   if (message.type === 'FABRIC_DETECTED' && sender.tab) {
     const tabId = sender.tab.id;
     const count = message.count || 0;
@@ -22,32 +21,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.action.setBadgeText({ tabId: sender.tab.id, text: '' });
   }
 
-  // 2. Network delegation for hover fetches (bypasses Content Script CORS and sandboxing)
+  // Delegated background fetch for hovered product links
   if (message.type === 'FETCH_HOVER_HTML') {
     const targetUrl = message.url;
 
-    if (fetchCache.has(targetUrl)) {
-      sendResponse({ success: true, html: fetchCache.get(targetUrl) });
+    if (cache.has(targetUrl)) {
+      sendResponse({ success: true, html: cache.get(targetUrl) });
       return true;
     }
 
     fetch(targetUrl, {
       method: 'GET',
+      credentials: 'include',
       headers: {
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Upgrade-Insecure-Requests': '1'
       }
     })
       .then(res => {
-        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
       .then(html => {
-        fetchCache.set(targetUrl, html);
+        cache.set(targetUrl, html);
         sendResponse({ success: true, html });
       })
       .catch(err => {
-        console.error('[Fabric Inspector] Background fetch failed:', err);
+        console.warn('[Fabric Inspector] Hover fetch failed:', err);
         sendResponse({ success: false, error: err.message });
       });
 
