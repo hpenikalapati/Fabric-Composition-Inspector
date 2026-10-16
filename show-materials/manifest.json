@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fabric Composition Inspector",
-  "version": "2.0.0",
+  "version": "2.1",
   "description": "Automatically extracts fabric & material composition across major clothing retailers.",
   "icons": {
     "16": "icon16.png",
