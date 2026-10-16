@@ -672,20 +672,20 @@
     for (const el of path) {
       if (!el || !el.getAttribute) continue;
 
-      // 1. Amazon card attribute (data-asin / data-csa-c-item-id)
+      // 1. Amazon direct ASIN card attribute (data-asin / data-csa-c-item-id)
       const asin = el.getAttribute('data-asin') || el.getAttribute('data-csa-c-item-id');
       if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
-        return { type: 'AMAZON', url: `https://www.amazon.com/dp/${asin.trim()}`, id: asin.trim() };
+        return { type: 'AMAZON', asin: asin.trim(), id: asin.trim() };
       }
 
       if (el.tagName === 'A' && el.href) {
         const href = el.href;
         const cleanUrl = href.split('#')[0];
 
-        // 1. Amazon (/dp/B0DCW38YR7)
+        // 1. Amazon URL (/dp/B0DCW38YR7)
         if (href.includes('amazon.com')) {
           const m = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-          if (m) return { type: 'AMAZON', url: `https://www.amazon.com/dp/${m[1]}`, id: m[1] };
+          if (m) return { type: 'AMAZON', asin: m[1], id: m[1] };
         }
 
         // 2. Target (/-/A-1010825429)
@@ -826,7 +826,26 @@
 
     renderLoading('Analyzing composition...');
 
-    // Route 1: Target RedSky API
+    // Route 1: Amazon ASIN Fetcher
+    if (targetInfo.type === 'AMAZON') {
+      safeSendMessage({ type: 'FETCH_AMAZON_HOVER', asin: targetInfo.asin }, (res) => {
+        if (currentHoverId !== targetInfo.id) return;
+        if (res && res.success && res.html) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(res.html, 'text/html');
+          const parsed = inspectDocument(doc, `https://www.amazon.com/dp/${targetInfo.asin}`);
+          memoryCache.set(targetInfo.id, parsed);
+          if (parsed) {
+            renderBadge(parsed);
+            return;
+          }
+        }
+        handleHoverFallback(targetInfo.id);
+      });
+      return;
+    }
+
+    // Route 2: Target RedSky API
     if (targetInfo.type === 'TARGET') {
       safeSendMessage({ type: 'FETCH_TARGET_HOVER', tcin: targetInfo.tcin }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
@@ -843,7 +862,7 @@
       return;
     }
 
-    // Route 2: Zara Catalog API + HTML Fallback
+    // Route 3: Zara Catalog API + HTML Fallback
     if (targetInfo.type === 'ZARA') {
       safeSendMessage({ type: 'FETCH_ZARA_HOVER', id: targetInfo.id, v1: targetInfo.v1, url: targetInfo.url }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
@@ -863,7 +882,7 @@
       return;
     }
 
-    // Route 3: Universal HTML + Hydration State Fetcher
+    // Route 4: Universal Retail HTML Fetcher
     safeSendMessage({
       type: 'FETCH_RETAIL_HTML',
       url: targetInfo.url,
