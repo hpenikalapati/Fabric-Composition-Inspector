@@ -1,7 +1,7 @@
 // background.js
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Fabric Inspector] Universal 18-Store Service Worker Ready.');
+  console.log('[Fabric Inspector] Service Worker Ready.');
 });
 
 const cache = new Map();
@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  // --- DEDICATED AMAZON HOVER FETCHER ---
+  // --- AMAZON DEDICATED HOVER FETCHER (ORIGINAL LOGIC) ---
   if (message.type === 'FETCH_AMAZON_HOVER') {
     const { asin } = message;
     const cacheKey = `AMAZON_${asin}`;
@@ -25,9 +25,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
 
-    const targetUrl = `https://www.amazon.com/dp/${asin}`;
-
-    fetch(targetUrl, {
+    fetch(`https://www.amazon.com/dp/${asin}`, {
       method: 'GET',
       credentials: 'omit',
       headers: {
@@ -40,10 +38,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return res.text();
       })
       .then(html => {
-        if (html.includes('api-services-support@amazon.com') || html.includes('validateCaptcha')) {
-          sendResponse({ success: false, error: 'Amazon CAPTCHA block' });
-          return;
-        }
         cache.set(cacheKey, html);
         sendResponse({ success: true, html });
       })
@@ -127,7 +121,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // --- UNIVERSAL RETAIL HTML FETCHER (Other 16 Stores) ---
+  // --- UNIVERSAL RETAIL HTML FETCHER ---
   if (message.type === 'FETCH_RETAIL_HTML') {
     const { url, storeKey, id } = message;
     const cacheKey = `${storeKey}_${id}`;
@@ -152,7 +146,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         cache.set(cacheKey, html);
         sendResponse({ success: true, html });
       })
-      .catch(err => sendResponse({ success: false, error: err.message }));
+      .catch(err => {
+        sendResponse({ success: false, error: err.message });
+      });
 
     return true;
   }
