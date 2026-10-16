@@ -826,14 +826,15 @@
 
     renderLoading('Analyzing composition...');
 
-    // Route 1: Amazon ASIN Fetcher
+    // Route 1: Amazon Dedicated Hover Fetcher (Original Reliable Logic)
     if (targetInfo.type === 'AMAZON') {
-      safeSendMessage({ type: 'FETCH_AMAZON_HOVER', asin: targetInfo.asin }, (res) => {
+      safeSendMessage({ type: 'FETCH_AMAZON_HOVER', asin: targetInfo.id }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
         if (res && res.success && res.html) {
           const parser = new DOMParser();
           const doc = parser.parseFromString(res.html, 'text/html');
-          const parsed = inspectDocument(doc, `https://www.amazon.com/dp/${targetInfo.asin}`);
+          const amazonText = extractAmazonDirect(doc);
+          const parsed = parseComposition(amazonText);
           memoryCache.set(targetInfo.id, parsed);
           if (parsed) {
             renderBadge(parsed);
@@ -882,7 +883,7 @@
       return;
     }
 
-    // Route 4: Universal Retail HTML Fetcher
+    // Route 4: Universal HTML + Hydration State Fetcher for all other stores
     safeSendMessage({
       type: 'FETCH_RETAIL_HTML',
       url: targetInfo.url,
@@ -909,7 +910,6 @@
       }
     });
   }
-
   function handleHoverFallback(id) {
     renderLoading('Click item to view details');
     setTimeout(() => {
