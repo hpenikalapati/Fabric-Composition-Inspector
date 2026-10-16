@@ -38,11 +38,14 @@
   const SITE_ADAPTERS = {
     'amazon.com': {
       selectors: [
+        '#productFactsDesktopExpander',
+        '#productFactsDesktop_feature_div',
         '#productOverview_feature_div',
         '#voyager-ns-desktop-side-sheet-content table.prodDetTable',
         '#detailBullets_feature_div',
         '#technicalSpecifications_section_1',
-        '#featurebullets_feature_div'
+        '#featurebullets_feature_div',
+        '#productDescription'
       ]
     },
     'macys.com': {
@@ -274,7 +277,6 @@
         }
       }
 
-      // Captures optional descriptor + fiber name (e.g., "recycled cotton" or "cotton")
       const lineRegex = new RegExp(
         `(\\d{1,3})%\\s*(?:of\\s+)?((?:(?:${DESCRIPTOR_WORDS})\\s+)?(?:${fiberPattern}))|((?:(?:${DESCRIPTOR_WORDS})\\s+)?(?:${fiberPattern}))\\s*[:\\-]?\\s*(\\d{1,3})%`,
         'gi'
@@ -298,8 +300,6 @@
           sections.push(targetSection);
         }
 
-        // Prevent duplicate scraping of the exact same block on the page
-        // by only adding if the section total is currently < 100%
         const currentTotal = targetSection.composition.reduce((sum, item) => sum + item.percentage, 0);
         if (currentTotal < 100) {
           for (const item of findings) {
@@ -321,7 +321,6 @@
 
     return sections.length > 0 ? sections : null;
   }
-
 
   // --- 4-LAYER EXTRACTION ENGINE ---
 
@@ -383,12 +382,11 @@
     return relevant.join(' \n ');
   }
 
-  // Layer 4: Extracts fabric strings directly from Next.js (__NEXT_DATA__), Redux, and embedded hydration scripts
   function extractFromScriptState(doc) {
     if (!doc) return '';
     const scripts = doc.querySelectorAll('script#__NEXT_DATA__, script:not([src])');
     const fiberPattern = FIBER_LIST.join('|');
-    const stateRegex = new RegExp(`"([^"]{0,120}\\b\\d{1,3}%\\s*(?:${DESCRIPTORS})?(?:${fiberPattern})[^"]{0,120})"`, 'gi');
+    const stateRegex = new RegExp(`"([^"]{0,120}\\b\\d{1,3}%\\s*(?:(?:${DESCRIPTOR_WORDS})\\s+)?(?:${fiberPattern})[^"]{0,120})"`, 'gi');
     const matches = [];
 
     for (const script of scripts) {
@@ -407,12 +405,27 @@
 
     const collected = [];
 
-    // 1. Broad text scan of all rows, table cells, and list items in the fetched Amazon doc
-    const nodes = doc.querySelectorAll('tr, li, div.a-row, span.a-list-item, div.po-row');
-    for (const node of nodes) {
-      const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
-      if (text.length < 250 && /fabric|material|composition|care instructions|shell|lining|cotton|polyester|viscose|rayon|spandex|nylon|wool|linen|modal|tencel|acrylic/i.test(text)) {
-        if (text.includes('%') || text.includes(':')) {
+    // 1. Target Amazon's 2026 Softlines Product Facts & Overview containers
+    const priorityContainers = doc.querySelectorAll(
+      '#productFactsDesktopExpander, #productFactsDesktop_feature_div, #productOverview_feature_div, #detailBullets_feature_div, #featurebullets_feature_div, #productDescription, #voyager-ns-desktop-side-sheet-content'
+    );
+
+    for (const container of priorityContainers) {
+      const rows = container.querySelectorAll('div.a-fixed-left-grid, tr, li, div.a-row, div.po-row');
+      for (const row of rows) {
+        const text = (row.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text.length < 350 && (text.includes('%') || /fabric|material|composition/i.test(text))) {
+          collected.push(text);
+        }
+      }
+    }
+
+    // 2. Fallback scan across all table rows, list items, and grid rows in the document
+    if (collected.length === 0) {
+      const nodes = doc.querySelectorAll('tr, li, div.a-fixed-left-grid, span.a-list-item, div.po-row');
+      for (const node of nodes) {
+        const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text.length < 300 && text.includes('%') && FIBER_LIST.some(f => text.toLowerCase().includes(f))) {
           collected.push(text);
         }
       }
@@ -448,7 +461,6 @@
       parsed = parseComposition(rawText);
     }
 
-    // Fallback to Hydration State Scripts (Walmart, AE, Gap, Uniqlo, H&M, J.Crew)
     if (!parsed && doc !== document) {
       const stateText = extractFromScriptState(doc);
       parsed = parseComposition(stateText);
@@ -580,8 +592,8 @@
 
   function getFiberFillClass(fiberName) {
     const f = fiberName.toLowerCase();
-    if (SEMI_SYNTHETIC_FIBERS.includes(f)) return 'fill-semi-synthetic';
-    if (NATURAL_FIBERS.includes(f)) return 'fill-natural';
+    if (SEMI_SYNTHETIC_FIBERS.some(semi => f.includes(semi))) return 'fill-semi-synthetic';
+    if (NATURAL_FIBERS.some(nat => f.includes(nat))) return 'fill-natural';
     return 'fill-synthetic';
   }
 
@@ -669,23 +681,36 @@
   function resolveHoverTarget(path) {
     if (!Array.isArray(path)) return null;
 
+    // 1. Amazon Outer Search Card Priority:
+    // Lock onto the main search result card first so tiny color swatches inside the card don't hijack the ASIN
+    if (currentHost.includes('amazon.com')) {
+      for (const el of path) {
+        if (el && el.getAttribute && (el.classList?.contains('s-result-item') || el.getAttribute('data-component-type') === 's-search-result')) {
+          const cardAsin = (el.getAttribute('data-asin') || '').trim();
+          if (/^[A-Z0-9]{10}$/i.test(cardAsin)) {
+            return { type: 'AMAZON', url: `https://www.amazon.com/dp/${cardAsin}`, id: cardAsin };
+          }
+        }
+      }
+    }
+
     for (const el of path) {
       if (!el || !el.getAttribute) continue;
 
-      // 1. Amazon direct ASIN card attribute (data-asin / data-csa-c-item-id)
-      const asin = el.getAttribute('data-asin') || el.getAttribute('data-csa-c-item-id');
+      // Amazon fallback attribute (carousels / grids)
+      const asin = el.getAttribute('data-asin');
       if (asin && /^[A-Z0-9]{10}$/i.test(asin.trim())) {
-        return { type: 'AMAZON', asin: asin.trim(), id: asin.trim() };
+        return { type: 'AMAZON', url: `https://www.amazon.com/dp/${asin.trim()}`, id: asin.trim() };
       }
 
       if (el.tagName === 'A' && el.href) {
         const href = el.href;
         const cleanUrl = href.split('#')[0];
 
-        // 1. Amazon URL (/dp/B0DCW38YR7)
+        // 1. Amazon (/dp/B0DCW38YR7)
         if (href.includes('amazon.com')) {
           const m = href.match(/\/dp\/([A-Z0-9]{10})/i) || decodeURIComponent(href).match(/\/dp\/([A-Z0-9]{10})/i);
-          if (m) return { type: 'AMAZON', asin: m[1], id: m[1] };
+          if (m) return { type: 'AMAZON', url: `https://www.amazon.com/dp/${m[1]}`, id: m[1] };
         }
 
         // 2. Target (/-/A-1010825429)
@@ -826,34 +851,14 @@
 
     renderLoading('Analyzing composition...');
 
-    // Route 1: Amazon Dedicated Hover Fetcher (Original Reliable Logic)
-    if (targetInfo.type === 'AMAZON') {
-      safeSendMessage({ type: 'FETCH_AMAZON_HOVER', asin: targetInfo.id }, (res) => {
-        if (currentHoverId !== targetInfo.id) return;
-        if (res && res.success && res.html) {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(res.html, 'text/html');
-          const amazonText = extractAmazonDirect(doc);
-          const parsed = parseComposition(amazonText);
-          memoryCache.set(targetInfo.id, parsed);
-          if (parsed) {
-            renderBadge(parsed);
-            return;
-          }
-        }
-        handleHoverFallback(targetInfo.id);
-      });
-      return;
-    }
-
-    // Route 2: Target RedSky API
+    // Route 1: Target RedSky API
     if (targetInfo.type === 'TARGET') {
       safeSendMessage({ type: 'FETCH_TARGET_HOVER', tcin: targetInfo.tcin }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
         if (res && res.success && res.specText) {
           const parsed = parseComposition(res.specText);
-          memoryCache.set(targetInfo.id, parsed);
           if (parsed) {
+            memoryCache.set(targetInfo.id, parsed);
             renderBadge(parsed);
             return;
           }
@@ -863,7 +868,7 @@
       return;
     }
 
-    // Route 3: Zara Catalog API + HTML Fallback
+    // Route 2: Zara Catalog API + HTML Fallback
     if (targetInfo.type === 'ZARA') {
       safeSendMessage({ type: 'FETCH_ZARA_HOVER', id: targetInfo.id, v1: targetInfo.v1, url: targetInfo.url }, (res) => {
         if (currentHoverId !== targetInfo.id) return;
@@ -876,14 +881,17 @@
             parsed = inspectDocument(doc, targetInfo.url);
           }
         }
-        memoryCache.set(targetInfo.id, parsed);
-        if (parsed) renderBadge(parsed);
-        else handleHoverFallback(targetInfo.id);
+        if (parsed) {
+          memoryCache.set(targetInfo.id, parsed);
+          renderBadge(parsed);
+        } else {
+          handleHoverFallback(targetInfo.id);
+        }
       });
       return;
     }
 
-    // Route 4: Universal HTML + Hydration State Fetcher for all other stores
+    // Route 3: Universal HTML + Hydration State Fetcher
     safeSendMessage({
       type: 'FETCH_RETAIL_HTML',
       url: targetInfo.url,
@@ -901,19 +909,20 @@
       const doc = parser.parseFromString(res.html, 'text/html');
       const parsed = inspectDocument(doc, targetInfo.url);
 
-      memoryCache.set(targetInfo.id, parsed);
-
       if (parsed) {
+        memoryCache.set(targetInfo.id, parsed);
         renderBadge(parsed);
       } else {
         handleHoverFallback(targetInfo.id);
       }
     });
   }
+
   function handleHoverFallback(id) {
     renderLoading('Click item to view details');
     setTimeout(() => {
       if (currentHoverId === id) {
+        currentHoverId = null; // Reset so re-hovering isn't locked out
         document.getElementById('fabric-detector-root')?.remove();
       }
     }, 1200);
@@ -927,12 +936,11 @@
     const targetInfo = resolveHoverTarget(path);
     if (targetInfo) {
       clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => dispatchHover(targetInfo), 90);
+      hoverTimer = setTimeout(() => dispatchHover(targetInfo), 120);
     }
   }, { capture: true, passive: true });
 
   // --- PRODUCT DETAIL PAGE (PDP) AUTO-INSPECTION ---
-  // Ensures 100% of websites work when clicked into a product page
   function isCurrentUrlPdp() {
     const href = window.location.href;
     const path = window.location.pathname;
@@ -971,12 +979,10 @@
     }
   }
 
-  // Run on initial PDP load + delayed hydration retries
   runPdpInspection();
   setTimeout(runPdpInspection, 1000);
   setTimeout(runPdpInspection, 2400);
 
-  // Re-run when clicking color/fit swatches on a PDP
   document.addEventListener('click', (e) => {
     const swatch = e.target.closest('button, a, label, li, div[class*="swatch"], [data-testid*="swatch"]');
     if (swatch && isCurrentUrlPdp()) {
@@ -984,7 +990,6 @@
     }
   }, { capture: true, passive: true });
 
-  // SPA navigation observer (when clicking from a catalog grid into a PDP without a full reload)
   let lastHref = location.href;
   new MutationObserver(() => {
     if (location.href !== lastHref) {
